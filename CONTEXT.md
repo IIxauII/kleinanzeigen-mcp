@@ -111,6 +111,10 @@ The top level of the location tree; sixteen exist.
 The party that posted a listing. Has an identity and an inventory, so it is a concept in its own right rather than a pair of fields on a listing.
 _Avoid_: Poster, vendor, user, owner
 
+**Seller id** _(Nutzer-ID)_:
+The numeric identifier of a seller. Every seller has one, private or commercial. Not to be confused with the third number in a listing URL, which is the location id.
+_Avoid_: User id
+
 **Seller type** _(Anbietertyp)_:
 Whether a seller is `PRIVATE` or `COMMERCIAL`. An enum, not a boolean: "not private" is a weaker claim than "commercial", and a seller type that cannot be read is unknown rather than private.
 
@@ -121,10 +125,16 @@ A seller posting as an individual. `posterType=PRIVATE`.
 A seller posting as a business. `posterType=COMMERCIAL`. Has a public shop page.
 
 **Seller inventory** _(Bestandsliste)_:
-Every listing one seller currently has online. A commercial seller's inventory is publicly reachable through their shop page; a private seller's is not reachable within this project's access constraints.
+Every listing one seller currently has online. Distinct from the count of listings a seller has ever posted, which their shop page also shows. A commercial seller's inventory is reachable through their shop page; a private seller's has a page of its own that this project does not read.
 
 **Shop page** _(Unternehmensseite)_:
-A commercial seller's public page, at `/pro/<slug>`, listing their inventory.
+A commercial seller's public page, at `/pro/<slug>`, carrying their profile and their inventory. Private sellers have none.
+
+**Shop slug** _(Unternehmensseiten-Slug)_:
+The text handle addressing a shop page. Unlike a category or a location, where only a numeric id identifies a node, the slug is the shop page's own address — but it is a second handle, not a replacement for the seller id.
+
+**Shop directory** _(Unternehmensseitenverzeichnis)_:
+Kleinanzeigen's public index of shop pages. The way to resolve a commercial seller's name to a shop slug.
 
 **Member since** _(Aktiv seit)_:
 The date a seller's account was created.
