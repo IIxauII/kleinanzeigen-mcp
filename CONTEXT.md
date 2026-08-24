@@ -135,7 +135,7 @@ Every listing one seller currently has online. Distinct from the count of listin
 A commercial seller's public page, at `/pro/<slug>`, carrying their profile and their inventory. Private sellers have none.
 
 **Shop slug** _(Unternehmensseiten-Slug)_:
-The text handle addressing a shop page. Unlike a category or a location, where only a numeric id identifies a node, the slug is the shop page's own address — but it is a second handle, not a replacement for the seller id.
+The text handle addressing a shop page. Unlike a category or a location, where only a numeric id identifies a node, the slug is the shop page's own address — but it is a second handle, not a replacement for the seller id. It is case-sensitive and may carry a numeric suffix where two shops share a name (`Autohaus-Meyer-GmbH` and `autohaus-meyer-gmbh-1` are different sellers), so it is never normalised.
 
 **Shop directory** _(Unternehmensseitenverzeichnis)_:
 Kleinanzeigen's public index of shop pages. The way to resolve a commercial seller's name to a shop slug.
