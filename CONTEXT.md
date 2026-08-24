@@ -41,6 +41,10 @@ _Avoid_: VIP, detail view
 A page of listings matching a search query. 25 organic listings per page.
 _Avoid_: SRP, listing page
 
+**Posting date** _(Einstelldatum)_:
+When a listing was published. Always in the site's own timezone, and readable at **two different precisions**: to the minute for the current and previous day, to the day otherwise. Which precision you get depends on where the listing was read, not on the listing — so the same listing is minute-precise in a search results page and day-precise on its listing detail page. A bump rewrites it.
+_Avoid_: Created at, published at, timestamp
+
 ### Price
 
 A listing's price is one of four mutually exclusive shapes. An amount is present only where the shape below says so, which is what keeps "negotiable with no number" from ever being read as "free".
