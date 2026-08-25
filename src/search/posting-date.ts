@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ParseError } from "../fetch/errors.ts";
+import { collapse } from "./text.ts";
 
 /**
  * When a listing was published, at whichever of the site's **two precisions**
@@ -91,7 +92,7 @@ const ABSOLUTE = /^(\d{2})\.(\d{2})\.(\d{4})$/u;
  * **Berlin** calendar date, and a test needs to stand at 00:30 to prove it.
  */
 export function parsePostingDate(rendered: string, now: Date = new Date()): PostingDate {
-  const text = rendered.replace(/\s+/gu, " ").trim();
+  const text = collapse(rendered);
 
   const relative = RELATIVE.exec(text);
   if (relative !== null) {

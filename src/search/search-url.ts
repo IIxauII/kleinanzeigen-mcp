@@ -1,13 +1,11 @@
 import { z } from "zod";
+import { LISTING_TYPES } from "./search-row.ts";
 
 export const ORIGIN = "https://www.kleinanzeigen.de";
 
-/** 25 organic listings per page × 50 pages. Measured, not assumed (SPEC 2.4). */
-export const LISTINGS_PER_PAGE = 25;
-export const LAST_HONEST_PAGE = 50;
-export const REACHABLE = LISTINGS_PER_PAGE * LAST_HONEST_PAGE;
-
-export const AD_TYPES = ["OFFER", "WANTED"] as const;
+// `ad_type` is the site's own argument spelling (SPEC 4.1), and its values are
+// the listing types `CONTEXT.md` already names — so the enum is that one, not a
+// second copy under a name the glossary tells us to avoid.
 export const POSTER_TYPES = ["PRIVATE", "COMMERCIAL"] as const;
 export const SHIPPING_CARRIERS = ["DHL", "HERMES"] as const;
 export const SORTS = ["SORTING_DATE", "PRICE_AMOUNT", "PRICE_AMOUNT_DESC"] as const;
@@ -28,7 +26,7 @@ export const SearchQuerySchema = z
     radius: z.number().int().nonnegative().optional(),
     min_price: z.number().nonnegative().optional(),
     max_price: z.number().nonnegative().optional(),
-    ad_type: z.enum(AD_TYPES).optional(),
+    ad_type: z.enum(LISTING_TYPES).optional(),
     poster_type: z.enum(POSTER_TYPES).optional(),
     shipping: z.boolean().optional(),
     shipping_carrier: z.enum(SHIPPING_CARRIERS).optional(),

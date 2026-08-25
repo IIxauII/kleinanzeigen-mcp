@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ParseError } from "../fetch/errors.ts";
+import { collapse } from "./text.ts";
 
 /**
  * A listing's price is one of four mutually exclusive shapes, and **never an
@@ -41,7 +42,7 @@ function amount(text: string): number {
  * could (SPEC 5.8).
  */
 export function parsePrice(rendered: string): Price {
-  const text = rendered.replace(/\s+/gu, " ").trim();
+  const text = collapse(rendered);
   if (text === "") return { kind: "Unpriced" };
   if (text === "Zu verschenken") return { kind: "Giveaway" };
   if (text === "VB") return { kind: "Negotiable" };

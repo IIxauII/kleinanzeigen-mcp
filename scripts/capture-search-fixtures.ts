@@ -20,9 +20,9 @@
 import * as cheerio from "cheerio";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { ORIGIN } from "../src/search/search-url.ts";
 import { USER_AGENT } from "../src/user-agent.ts";
 
-const ORIGIN = "https://www.kleinanzeigen.de";
 const RAW_DIR = fileURLToPath(new URL("../.fixture-capture/", import.meta.url));
 const OUT_DIR = fileURLToPath(new URL("../tests/fixtures/", import.meta.url));
 
@@ -95,9 +95,9 @@ function redactor() {
     place(real: string): string {
       const known = places.get(real);
       if (known !== undefined) return known;
-      const stand_in = PLACES[places.size % PLACES.length]!;
-      places.set(real, stand_in);
-      return stand_in;
+      const standIn = PLACES[places.size % PLACES.length]!;
+      places.set(real, standIn);
+      return standIn;
     },
     postcode: (index: number): string => String(10000 + ((index * 137) % 89999)),
     adId: (index: number): string => String(3400000000 + index),
@@ -107,7 +107,7 @@ function redactor() {
       `https://img.kleinanzeigen.de/api/v1/prod-ads/images/00/00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
     /** The ld+json description is ~200 characters and ends truncated; the visible one is shorter. */
     long: (index: number): string => `${LOREM.slice(0, 197)}... [${index}]`,
-    short: (index: number): string => `${LOREM.slice(0, 92)}...`,
+    short: (): string => `${LOREM.slice(0, 92)}...`,
   };
 }
 
@@ -156,7 +156,7 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
       .attr("alt", `${redact.title(index)} Vorschau`);
 
     article.find("h2 a").text(redact.title(index));
-    article.find("p.aditem-main--middle--description").text(redact.short(index));
+    article.find("p.aditem-main--middle--description").text(redact.short());
 
     // `<i class="icon-pin-gray"/> 13353 Wedding` and, under a radius, a
     // `(3 km)` or `(ca. 20 km)` in a text node of its own.
