@@ -38,8 +38,15 @@ export type Fetched<T> = {
  */
 export type Parse<T> = (body: string, response: Response) => T;
 
+/**
+ * A JSON body, which turns the request into the `POST` the two `_actions`
+ * endpoints take (SPEC 2.2). Omitted, and the request is the `GET` every HTML
+ * surface is read with.
+ */
+export type PostBody = Record<string, unknown>;
+
 export type FetchCore = {
-  fetch<T>(url: string, parse: Parse<T>): Promise<Fetched<T>>;
+  fetch<T>(url: string, parse: Parse<T>, body?: PostBody): Promise<Fetched<T>>;
 };
 
 export type FetchCoreOptions = {
@@ -61,6 +68,18 @@ function retryAfterMs(response: Response): number | null {
 }
 
 const isRetryableStatus = (status: number): boolean => status === 429 || status >= 500;
+
+/**
+ * The cache key of a `POST`, whose parameters are in the body rather than in
+ * the query string.
+ *
+ * Keys are sorted for the same reason `normaliseUrl` sorts query pairs: the
+ * order they were written in must not fragment the cache. Values are **not**
+ * touched — a keyword rides this body, and the rule there is to pass the
+ * caller's string through (SPEC 4.5, 6.1).
+ */
+const stableBody = (body: PostBody): string =>
+  JSON.stringify(Object.fromEntries(Object.entries(body).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))));
 
 /** Anything thrown that is not already one failed attempt becomes one, keeping its reason. */
 function asFailure(error: unknown): RequestFailure {
@@ -96,7 +115,7 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
   /** Backoff starts at the operator's politeness gap and doubles: 1500 ms, then 3000 ms by default. */
   const backoffMs = (retry: number): number => options.rateLimitMs * 2 ** retry;
 
-  async function attempt<T>(url: string, parse: Parse<T>): Promise<T> {
+  async function attempt<T>(url: string, parse: Parse<T>, post?: PostBody): Promise<T> {
     const startedAt = Date.now();
     let response: Response;
     let body: string;
@@ -116,7 +135,12 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
             throw refusal(blockedFor);
           }
           const sent = await fetchImpl(url, {
-            headers: { "user-agent": USER_AGENT },
+            method: post === undefined ? "GET" : "POST",
+            headers:
+              post === undefined
+                ? { "user-agent": USER_AGENT }
+                : { "user-agent": USER_AGENT, "content-type": "application/json" },
+            ...(post === undefined ? {} : { body: JSON.stringify(post) }),
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             redirect: "follow",
           });
@@ -144,6 +168,15 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
       throw new RequestFailure("block", "kleinanzeigen has blocked this IP range; requests are paused");
     }
 
+    // **A 204 is an error, never zero results** (SPEC 4.5). The site never
+    // sends one as an answer: the shop directory returns it for a `pageSize`
+    // it will not serve, and the shop inventory RPC returns it for a
+    // `brandName` that does not exist. Reading either as "no listings" would
+    // report an empty inventory for a shop nobody looked at.
+    if (response.status === 204) {
+      throw new RequestFailure("http_error", "HTTP 204 with a zero-byte body, which is never an answer");
+    }
+
     if (!response.ok) {
       const status = response.status;
       throw new RequestFailure(
@@ -162,10 +195,10 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
     }
   }
 
-  async function fetchFresh<T>(url: string, parse: Parse<T>): Promise<T> {
+  async function fetchFresh<T>(url: string, parse: Parse<T>, post?: PostBody): Promise<T> {
     for (let retry = 0; ; retry++) {
       try {
-        return await attempt(url, parse);
+        return await attempt(url, parse, post);
       } catch (error) {
         const failure = asFailure(error);
         if (!failure.retryable || retry >= MAX_RETRIES) throw failure;
@@ -189,9 +222,14 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
   }
 
   return {
-    async fetch<T>(url: string, parse: Parse<T>): Promise<Fetched<T>> {
+    async fetch<T>(url: string, parse: Parse<T>, post?: PostBody): Promise<Fetched<T>> {
       const key = normaliseUrl(url);
-      const cached = cache.get(key) as CacheEntry<T> | null;
+      // The URL alone is the key of a `GET` and never of a `POST`: both shop
+      // RPC pages are the same URL, and keying on it would serve page 2 for
+      // page 3 (SPEC 6.1). `source_url` stays the URL either way — it says
+      // where the data came from, not how it was asked for.
+      const entry = post === undefined ? key : `${key} ${stableBody(post)}`;
+      const cached = cache.get(entry) as CacheEntry<T> | null;
       if (cached !== null && cached.fresh) {
         // No request, and the limiter is skipped entirely (SPEC 2.8).
         log("cache_hit", { url: key, fetched_at: cached.fetched_at });
@@ -207,7 +245,7 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
           log("breaker_open", { level: "error", url: key, cooldown_left_ms: blockedFor });
           throw refusal(blockedFor);
         }
-        const stored = cache.set(key, await fetchFresh(key, parse)) as CacheEntry<T>;
+        const stored = cache.set(entry, await fetchFresh(key, parse, post)) as CacheEntry<T>;
         return {
           data: stored.value,
           envelope: { fetched_at: stored.fetched_at, stale: false, source_url: key },
@@ -222,7 +260,7 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
           log("fetch_failed", { url: key, reason: failed.reason, message: failed.message });
         }
 
-        const stale = cache.get(key) as CacheEntry<T> | null;
+        const stale = cache.get(entry) as CacheEntry<T> | null;
         if (stale === null) throw new FetchError(failed.reason, failed.message);
         log("stale_serve", { url: key, reason: failed.reason, fetched_at: stale.fetched_at });
         return {

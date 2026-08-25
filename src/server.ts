@@ -4,6 +4,7 @@ import { loadCityDataset, type CityDataset } from "./locations/city-dataset.ts";
 import { registerFindCategory } from "./tools/find-category.ts";
 import { registerFindLocation } from "./tools/find-location.ts";
 import { registerGetListing } from "./tools/get-listing.ts";
+import { registerGetShop } from "./tools/get-shop.ts";
 import { registerSearchListings } from "./tools/search-listings.ts";
 import { VERSION } from "./version.ts";
 
@@ -30,6 +31,7 @@ export function createServer({
   );
   registerSearchListings(server, readCityDataset);
   registerGetListing(server);
+  registerGetShop(server);
   registerFindCategory(server, readCategoryTree);
   registerFindLocation(server, readCityDataset);
   return server;

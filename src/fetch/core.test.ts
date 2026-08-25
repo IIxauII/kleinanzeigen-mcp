@@ -400,6 +400,71 @@ describe("the one stale-serve rule", () => {
   });
 });
 
+describe("the two _actions endpoints, which are POSTs", () => {
+  const RPC = "https://www.kleinanzeigen.de/_actions/proPublicWeb.brandProfile.getAds/";
+
+  /** A 204 carries no body at all — the `Response` constructor refuses to give it one. */
+  const noContent: Reply = () => new Response(null, { status: 204 });
+
+  it("sends the body as JSON, and says so, while a GET stays a GET", async () => {
+    const { impl, calls } = scripted(page("total:1"));
+    await core(impl).fetch(RPC, parseTotal, { brandName: "a-shop", pageNum: 2 });
+    expect(calls[0]!.init.method).toBe("POST");
+    expect(calls[0]!.init.body).toBe(JSON.stringify({ brandName: "a-shop", pageNum: 2 }));
+    expect(calls[0]!.init.headers).toMatchObject({
+      "user-agent": USER_AGENT,
+      "content-type": "application/json",
+    });
+
+    const plain = scripted(page("total:1"));
+    await core(plain.impl).fetch(URL_A, parseTotal);
+    expect(plain.calls[0]!.init.method).toBe("GET");
+    expect(plain.calls[0]!.init.body).toBeUndefined();
+  });
+
+  it("caches on the body as well as the URL, because every RPC page is one URL", async () => {
+    // Keyed on the URL alone, page 3 would be served page 2's answer
+    // (SPEC 6.1).
+    const { impl, calls } = scripted(page("total:1"), page("total:2"));
+    const fetchCore = core(impl, 0);
+    const first = await fetchCore.fetch(RPC, parseTotal, { pageNum: 2 });
+    const second = await fetchCore.fetch(RPC, parseTotal, { pageNum: 3 });
+    const again = await fetchCore.fetch(RPC, parseTotal, { pageNum: 2 });
+    expect([first.data, second.data, again.data]).toEqual([{ total: 1 }, { total: 2 }, { total: 1 }]);
+    expect(calls).toHaveLength(2);
+    // The envelope still says where the data came from, not how it was asked for.
+    expect(first.envelope.source_url).toBe(RPC);
+  });
+
+  it("does not let the order the body was written in fragment the cache", async () => {
+    const { impl, calls } = scripted(page("total:1"));
+    const fetchCore = core(impl, 0);
+    await fetchCore.fetch(RPC, parseTotal, { brandName: "a-shop", pageNum: 2 });
+    await fetchCore.fetch(RPC, parseTotal, { pageNum: 2, brandName: "a-shop" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("treats a 204 as a failure, never as an answer with nothing in it", async () => {
+    // The site never sends one as a result: the directory returns it for a
+    // page size it will not serve, and the inventory RPC for a brand that does
+    // not exist (SPEC 4.5).
+    const { impl } = scripted(noContent);
+    const error = await core(impl)
+      .fetch(RPC, parseTotal, { brandName: "no-such-shop" })
+      .catch((thrown: unknown) => thrown);
+    expect(error).toBeInstanceOf(FetchError);
+    expect(error).toMatchObject({ reason: "http_error" });
+  });
+
+  it("does not retry a 204, because nothing about it will differ next time", async () => {
+    const { impl, calls } = scripted(noContent);
+    await core(impl)
+      .fetch(URL_A, parseTotal)
+      .catch(() => undefined);
+    expect(calls).toHaveLength(1);
+  });
+});
+
 describe("the process-global core", () => {
   afterEach(resetFetchCore);
 

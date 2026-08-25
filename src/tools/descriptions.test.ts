@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FIND_CATEGORY_DESCRIPTION } from "./find-category.ts";
 import { FIND_LOCATION_DESCRIPTION } from "./find-location.ts";
 import { GET_LISTING_DESCRIPTION } from "./get-listing.ts";
+import { GET_SHOP_DESCRIPTION } from "./get-shop.ts";
 import { SEARCH_LISTINGS_DESCRIPTION } from "./search-listings.ts";
 
 const SPEC = new URL("../../SPEC.md", import.meta.url);
@@ -48,5 +49,9 @@ describe("the tool descriptions", () => {
 
   it("are get_listing's from SPEC 4.2, verbatim", () => {
     expect(GET_LISTING_DESCRIPTION).toBe(descriptionInSpec("4.2", "get_listing"));
+  });
+
+  it("are get_shop's from SPEC 4.3, verbatim", () => {
+    expect(GET_SHOP_DESCRIPTION).toBe(descriptionInSpec("4.3", "get_shop"));
   });
 });
