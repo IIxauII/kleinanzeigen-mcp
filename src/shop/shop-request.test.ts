@@ -25,6 +25,22 @@ describe("get_shop's arguments", () => {
     }
   });
 
+  it("refuses a backslash, which WHATWG reads as a path separator", () => {
+    // Left in, `..\..\s-anzeige\123` resolves to `//s-anzeige//123` — off
+    // `/pro/` entirely, and a rate-limited request spent on a URL nobody asked
+    // for.
+    expect(GetShopArgsSchema.safeParse({ shop_slug: "..\\..\\s-anzeige" }).success).toBe(false);
+    expect(new URL("/pro/..\\..", "https://www.kleinanzeigen.de").pathname).toBe("/");
+  });
+
+  it("takes whole euros, as the site's own bounds are", () => {
+    // A fractional or exponent-form bound reaches the action as `"19.99"` or
+    // `"1e+21"`, which it validates as a string and answers however it likes.
+    expect(GetShopArgsSchema.safeParse({ shop_slug: "a-shop", min_price: 19.99 }).success).toBe(false);
+    expect(GetShopArgsSchema.safeParse({ shop_slug: "a-shop", max_price: 1e21 }).success).toBe(false);
+    expect(GetShopArgsSchema.safeParse({ shop_slug: "a-shop", min_price: 20 }).success).toBe(true);
+  });
+
   it("refuses an argument the surface does not have", () => {
     // Strict, for the reason the search surface is: an argument that does not
     // exist must not look answered (SPEC 2.6).

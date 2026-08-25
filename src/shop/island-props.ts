@@ -24,8 +24,15 @@ const VALUE = 0;
 /** An array, whose elements are themselves pairs. */
 const ARRAY = 1;
 
-/** The island's stable name, from `opts`. `component-url` carries a build hash and moves. */
-function islandName(opts: string | undefined): string | null {
+/**
+ * The island's stable name, from `opts`. `component-url` carries a build hash
+ * and moves with every deploy.
+ *
+ * Exported so the fixture capture picks its islands by the same reading the
+ * parser does — a fixture written by a second opinion of "which island is
+ * this" is the drift SPEC 8.6 exists to prevent.
+ */
+export function islandName(opts: string | undefined): string | null {
   if (opts === undefined) return null;
   try {
     const parsed: unknown = JSON.parse(opts);

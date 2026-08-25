@@ -30,6 +30,7 @@
 import * as cheerio from "cheerio";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { islandName } from "../src/shop/island-props.ts";
 import { shopAdsRequest, shopPageUrl, SHOP_PAGE_SIZE } from "../src/shop/shop-request.ts";
 import { raw, rawPost } from "./capture-raw.ts";
 import { redactor } from "./redact.ts";
@@ -107,7 +108,7 @@ const value = (pair: unknown): unknown => (pair as Pair)[1];
 const asRecord = (pair: unknown): Record<string, unknown> => value(pair) as Record<string, unknown>;
 
 /** A pair holding a value, which is how everything but an array is spelled. */
-const held = (held: unknown): Pair => [0, held];
+const pair = (value_: unknown): Pair => [0, value_];
 
 /** `[0]` — a pair with nothing in it — is how the page spells a value it does not have. */
 const present = (pair: unknown): boolean => pair !== undefined && value(pair) !== undefined;
@@ -115,8 +116,8 @@ const present = (pair: unknown): boolean => pair !== undefined && value(pair) !=
 function islandField(ad: Record<string, unknown>): Field {
   return {
     get: (key) => (ad[key] === undefined ? undefined : value(ad[key])),
-    set: (key, held_) => {
-      ad[key] = held(held_);
+    set: (key, replacement) => {
+      ad[key] = pair(replacement);
     },
   };
 }
@@ -126,13 +127,13 @@ function redactIsland(name: string, props: Record<string, unknown>, redact: Reda
     // Each is rewritten only where the page has one: the shop that does not
     // exist has neither id, and a fixture that invented them for it would hide
     // the very absence it is captured to prove.
-    if (present(props["brandName"])) props["brandName"] = held(redact.shopSlug(0));
-    if (present(props["sellerId"])) props["sellerId"] = held(Number(redact.userId(0)));
-    if (present(props["storeId"])) props["storeId"] = held(redact.storeId(0));
+    if (present(props["brandName"])) props["brandName"] = pair(redact.shopSlug(0));
+    if (present(props["sellerId"])) props["sellerId"] = pair(Number(redact.userId(0)));
+    if (present(props["storeId"])) props["storeId"] = pair(redact.storeId(0));
     const about = props["about"] === undefined ? undefined : asRecord(props["about"]);
     if (about !== undefined) {
-      if (about["description"] !== undefined) about["description"] = held(redact.body(0));
-      if (about["summary"] !== undefined) about["summary"] = held(redact.short());
+      if (about["description"] !== undefined) about["description"] = pair(redact.body(0));
+      if (about["summary"] !== undefined) about["summary"] = pair(redact.short());
     }
     // A named employee, their photograph and their bio. Nothing reads it.
     delete props["contactPerson"];
@@ -148,15 +149,15 @@ function redactIsland(name: string, props: Record<string, unknown>, redact: Reda
     return props;
   }
   if (name === "ProfileActions") {
-    props["userId"] = held(redact.userId(0));
-    props["internalUrl"] = held(`https://www.kleinanzeigen.de/pro/${redact.shopSlug(0)}`);
-    props["title"] = held(redact.shopName(0));
-    props["description"] = held(redact.body(0));
-    props["logoUrl"] = held(`${redact.image(999)}?rule=$_12.JPG`);
+    props["userId"] = pair(redact.userId(0));
+    props["internalUrl"] = pair(`https://www.kleinanzeigen.de/pro/${redact.shopSlug(0)}`);
+    props["title"] = pair(redact.shopName(0));
+    props["description"] = pair(redact.body(0));
+    props["logoUrl"] = pair(`${redact.image(999)}?rule=$_12.JPG`);
     return props;
   }
   // UserBadges: the name a third time, and reputation markers that name nobody.
-  props["companyName"] = held(redact.shopName(0));
+  props["companyName"] = pair(redact.shopName(0));
   return props;
 }
 
@@ -178,13 +179,16 @@ function minimiseShopPage(body: string, name: string): string {
   for (const element of $.root().find("astro-island").toArray()) {
     const node = $(element);
     const opts = node.attr("opts");
-    const island = opts === undefined ? null : (JSON.parse(opts) as { name?: string }).name;
-    if (island === undefined || island === null || !ISLANDS.includes(island as (typeof ISLANDS)[number])) continue;
+    if (opts === undefined) continue;
+    // The parser's own reading of which island this is, imported rather than
+    // repeated (SPEC 8.6).
+    const island = islandName(opts);
+    if (island === null || !ISLANDS.includes(island as (typeof ISLANDS)[number])) continue;
     const props = node.attr("props");
     if (props === undefined) throw new Error(`${name}: the ${island} island carries no props`);
     const redacted = redactIsland(island, JSON.parse(props) as Record<string, unknown>, redact);
     kept.push(
-      `    <astro-island opts="${escapeAttribute(opts!)}" component-export="default" ` +
+      `    <astro-island opts="${escapeAttribute(opts)}" component-export="default" ` +
         `props="${escapeAttribute(JSON.stringify(redacted))}"></astro-island>`,
     );
   }

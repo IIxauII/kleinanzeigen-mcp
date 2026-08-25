@@ -53,6 +53,12 @@ export type Shop = z.infer<typeof ShopSchema>;
  * `tags` is the one field the shop surface has that a search row does not: the
  * size a clothing or footwear listing is filed under, which the shop cards
  * render and the results page does not.
+ *
+ * Two of the twelve fields the encodings carry are deliberately left behind:
+ * **`retinaImage`** is the same picture at `rule=$_35` rather than `rule=$_2`,
+ * derivable from `thumbnail` and identifying nothing new, and
+ * **`hasVirtualTour`** was `false` on all 65 listings sampled and has no field
+ * on any type here.
  */
 export const ShopRowSchema = z.object({
   ad_id: z.string(),

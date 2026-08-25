@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ORIGIN } from "../search/search-url.ts";
+import { ORIGIN, SITE_HOSTS } from "../search/search-url.ts";
 
 /** The shop page. Private sellers have none (SPEC 2.2, 4.3). */
 const SHOP_PATH = "/pro/";
@@ -31,8 +31,12 @@ export const GetShopArgsSchema = z.strictObject({
   shop_slug: z
     .string()
     .min(1)
+    // A backslash is refused alongside the three obvious separators: WHATWG
+    // reads `\` as a path separator for a special scheme, so `..\..\x` would
+    // leave `/pro/` entirely and spend a rate-limited request on a URL nobody
+    // asked for.
     .regex(
-      /^[^/?#]+$/u,
+      /^[^/\\?#]+$/u,
       "shop_slug is the handle on its own — the segment after /pro/, without the rest of the URL",
     )
     // `.` and `..` are not handles; both resolve away from the shop page entirely.
@@ -41,8 +45,11 @@ export const GetShopArgsSchema = z.strictObject({
   keywords: z.string().optional(),
   category_id: z.number().int().positive().optional(),
   location_id: z.number().int().positive().optional(),
-  min_price: z.number().nonnegative().optional(),
-  max_price: z.number().nonnegative().optional(),
+  // Whole euros, as the site's own bounds are. A fractional or exponent-form
+  // bound would reach the action as `"19.99"` or `"1e+21"`, which it validates
+  // as a string and answers however it likes.
+  min_price: z.number().int().nonnegative().optional(),
+  max_price: z.number().int().nonnegative().optional(),
 });
 
 export type GetShopArgs = z.infer<typeof GetShopArgsSchema>;
@@ -69,6 +76,28 @@ export function isFiltered(args: GetShopArgs): boolean {
 /** `/pro/<slug>` — the slug as given, byte for byte (SPEC 3.5). */
 export function shopPageUrl(shop_slug: string): string {
   return new URL(`${SHOP_PATH}${shop_slug}`, ORIGIN).toString();
+}
+
+/**
+ * What the URL a fetch came to rest on says about what was served.
+ *
+ * Three answers rather than two, and the module that builds the URL is the one
+ * that reads it back — the same pairing `listing-url.ts` makes, for the same
+ * reason: "not a shop page" and "we cannot tell" are different things and only
+ * the first is an answer (SPEC 5.3, 6.3).
+ */
+export type FinalUrl = "shop" | "not-a-shop" | "unreadable";
+
+export function readFinalUrl(url: string): FinalUrl {
+  let host: string;
+  let path: string;
+  try {
+    ({ host, pathname: path } = new URL(url));
+  } catch {
+    return "unreadable";
+  }
+  if (!SITE_HOSTS.has(host)) return "unreadable";
+  return path.startsWith(SHOP_PATH) ? "shop" : "not-a-shop";
 }
 
 export type ShopAdsRequest = { url: string; body: Record<string, unknown> };
