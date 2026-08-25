@@ -27,6 +27,9 @@ const tree = () => loadCategoryTree(BUNDLED);
 type FindCategoryResult = {
   matches: { category_id: number; name: string; parent_name: string | null }[];
   count: number;
+  fetched_at: string;
+  stale: boolean;
+  source_url: string | null;
 };
 
 async function findCategory(client: Client, query: string): Promise<FindCategoryResult> {
@@ -73,7 +76,16 @@ describe("find_category over MCP", () => {
 
   it("answers a name it does not know with an empty list, not an error", async () => {
     const result = await findCategory(await connect(tree), "Raumfahrt");
-    expect(result).toEqual({ matches: [], count: 0 });
+    expect(result).toMatchObject({ matches: [], count: 0 });
+  });
+
+  it("carries the envelope, with no source url because it reads none", async () => {
+    const before = Date.now();
+    const result = await findCategory(await connect(tree), "Autos");
+    expect(result.stale).toBe(false);
+    expect(result.source_url).toBeNull();
+    expect(result).not.toHaveProperty("stale_reason");
+    expect(Date.parse(result.fetched_at)).toBeGreaterThanOrEqual(before - 1000);
   });
 
   it("also serialises the result as text content", async () => {
