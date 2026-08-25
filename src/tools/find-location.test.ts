@@ -143,4 +143,16 @@ describe("find_location over MCP", () => {
     const result = await client.callTool({ name: "find_location", arguments: {} });
     expect(result.isError).toBe(true);
   });
+
+  it("refuses an argument it does not have, rather than ignoring it", async () => {
+    // The same rule the filter surface follows: a caller that invents `radius`
+    // is told, instead of reading the whole dataset's matches as a scoped set
+    // (SPEC 2.6).
+    const client = await connect(dataset);
+    const result = await client.callTool({
+      name: "find_location",
+      arguments: { query: "Köln", radius: 20 },
+    });
+    expect(result.isError).toBe(true);
+  });
 });
