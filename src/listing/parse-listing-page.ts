@@ -1,9 +1,11 @@
 import * as cheerio from "cheerio";
+import { text, type Selection } from "../dom.ts";
 import { ParseError } from "../fetch/errors.ts";
+import { log } from "../logging.ts";
 import { parsePostingDate, type PostingDate } from "../search/posting-date.ts";
 import { parsePrice, type Price } from "../search/price.ts";
 import { collapse } from "../search/text.ts";
-import { isListingDetailUrl } from "./listing-url.ts";
+import { readFinalUrl } from "./listing-url.ts";
 import type { ListingResult, Seller } from "./listing.ts";
 import { readViewAdInit, type ViewAdInit } from "./view-ad-init.ts";
 
@@ -13,11 +15,6 @@ export type ParseOptions = {
   /** The ad id that was asked for, which the page has to agree it is. */
   ad_id: string;
 };
-
-/** One cheerio selection — spelled without reaching past cheerio into `domhandler`. */
-type Selection = ReturnType<ReturnType<cheerio.CheerioAPI["root"]>["find"]>;
-
-const text = (node: Selection): string => collapse(node.text());
 
 /** A node that has to be there: its absence is a DOM change, not a listing without one. */
 function required($: cheerio.CheerioAPI, selector: string): Selection {
@@ -55,7 +52,7 @@ function canonical($: cheerio.CheerioAPI): {
  * A real-estate listing prefixes a street, which has no field on this type and
  * is dropped rather than folded into the locality's name.
  */
-function where(rendered: string): { postcode: string | null; location_name: string | null } {
+function parseLocality(rendered: string): { postcode: string | null; location_name: string | null } {
   const parts = /\b(\d{5})\s+(.+)$/u.exec(collapse(rendered));
   if (parts === null) return { postcode: null, location_name: null };
   const names = parts[2]!.split(" - ");
@@ -63,16 +60,21 @@ function where(rendered: string): { postcode: string | null; location_name: stri
 }
 
 /**
- * The price, from the JS init — **and cross-checked against the rendered
- * string**, which is an independent reading of the same value (SPEC 3.1, 5.8).
+ * The price, **from the JS init** — the source §3.1 names for this surface —
+ * and held against the rendered string, which is a second reading of the same
+ * value (SPEC 3.1, 5.8).
  *
- * The init is what carries the amount: the rendered string is rounded for
- * display, and `adPriceType` is the authoritative discriminator. The rendered
- * string is what carries a *second opinion* on the shape, and a page where the
- * two part ways is a page this parser no longer understands.
+ * The init carries the amount: `adPriceType` is the authoritative
+ * discriminator and the rendered figure is rounded for display. The rendered
+ * string carries a second opinion on the *shape*, and two readings that part
+ * ways mean the page is not what this parser thinks it is.
+ *
+ * A rendering this parser cannot read at all is **not** that disagreement, and
+ * does not fail the listing: the init has already said what the shape is, and
+ * an unknown price *wording* is worth a shout on stderr rather than the whole
+ * listing (SPEC 5.8, 6.4).
  */
 function price(init: ViewAdInit, rendered: string): Price {
-  const shown = parsePrice(rendered);
   const read = ((): Price => {
     switch (init.price_type) {
       case "FIXED":
@@ -87,10 +89,16 @@ function price(init: ViewAdInit, rendered: string): Price {
       // The category has no price field, which is a normal state (SPEC 3.1).
       case "":
         return { kind: "Unpriced" };
-      default:
-        throw new ParseError(`unknown adPriceType ${JSON.stringify(init.price_type)}`);
     }
   })();
+
+  let shown: Price;
+  try {
+    shown = parsePrice(rendered);
+  } catch {
+    log("price_unreadable", { level: "error", kind: read.kind });
+    return read;
+  }
   if (read.kind !== shown.kind) {
     throw new ParseError(`the init says ${read.kind} where the page renders ${shown.kind}`);
   }
@@ -131,6 +139,21 @@ function attributes($: cheerio.CheerioAPI): { label: string; value: string }[] {
     });
 }
 
+/**
+ * The seller's id, from whichever of its two homes this page has (SPEC 3.5).
+ *
+ * A **private** seller's is in the link to their own listings; a
+ * **commercial** seller has no such link, and theirs is on the element behind
+ * the imprint dialog, where it matches their shop page's `sellerId`. `userId`
+ * in the JS init is present and empty on both, and is never a source.
+ */
+function sellerId($: cheerio.CheerioAPI, box: Selection): number | null {
+  const own = /[?&]userId=(\d+)\b/u.exec(box.find('a[href*="userId="]').first().attr("href") ?? "");
+  if (own !== null) return Number(own[1]);
+  const commercial = $("#viewad-commercial-policy-documents").first().attr("data-user-id") ?? "";
+  return /^\d+$/u.test(commercial) ? Number(commercial) : null;
+}
+
 /** `Aktiv seit 24.06.2014` → `2014-06`. The day is not carried: `member_since` is a month. */
 function memberSince(details: string[]): string | null {
   for (const detail of details) {
@@ -155,12 +178,10 @@ function seller($: cheerio.CheerioAPI, init: ViewAdInit): Seller {
     .toArray()
     .map((detail) => text($(detail)));
 
-  const own = /[?&]userId=(\d+)\b/u.exec(box.find('a[href*="userId="]').first().attr("href") ?? "");
-  const commercial = $("#viewad-commercial-policy-documents").first().attr("data-user-id");
   const shop = /^\/pro\/([^/?#]+)/u.exec(box.find('a[href^="/pro/"]').first().attr("href") ?? "");
 
   return {
-    seller_id: own !== null ? Number(own[1]) : /^\d+$/u.test(commercial ?? "") ? Number(commercial) : null,
+    seller_id: sellerId($, box),
     // **Never defaulted to a pole**: a seller type that cannot be read is
     // unknown, and "not commercial" is a weaker claim than "private".
     seller_type: init.commercial === null ? null : init.commercial ? "COMMERCIAL" : "PRIVATE",
@@ -191,11 +212,14 @@ function seller($: cheerio.CheerioAPI, init: ViewAdInit): Seller {
  * page has to agree it is the listing that was asked for.
  */
 export function parseListingPage(body: string, options: ParseOptions): ListingResult {
-  // A response that cannot say where it ended up cannot be read as gone
-  // either: "we could not tell" is a failure, and only "we looked, and it is
-  // not a listing" is an answer.
-  if (options.finalUrl === "") throw new ParseError("the response carries no final URL to check");
-  if (!isListingDetailUrl(options.finalUrl)) return { status: "gone" };
+  const landed = readFinalUrl(options.finalUrl);
+  // A response that cannot say where it ended up — no URL, or one on a host
+  // that is not the site's — is a failure, not a gone: only "we looked, and it
+  // is not a listing" is an answer (SPEC 6.3).
+  if (landed === "unreadable") {
+    throw new ParseError(`the response came to rest at ${JSON.stringify(options.finalUrl)}, which says nothing`);
+  }
+  if (landed === "not-a-listing") return { status: "gone" };
 
   const $ = cheerio.load(body);
   const init = readViewAdInit(body);
@@ -225,11 +249,14 @@ export function parseListingPage(body: string, options: ParseOptions): ListingRe
     // The full text, with the line breaks the page preserves.
     description: required($, "#viewad-description-text").text().trim(),
     price: price(init, $("#viewad-price").first().text()),
-    ...where(required($, "#viewad-locality").text()),
+    ...parseLocality(required($, "#viewad-locality").text()),
     posted: posted(required($, "#viewad-extra-info").text()),
     // **Exactly what the page gave**, large gallery URLs and all, with no
     // size-grammar rewriting (SPEC 3.3).
     images,
+    // **Derived, and it has to be**: a search row states its count in
+    // `.galleryimage--counter`, and the only counters on a detail page belong
+    // to the *other* listings at the foot of it. The gallery is the count.
     image_count: images.length,
     listing_type: soldLabel === "Gefunden" ? "WANTED" : "OFFER",
     attributes: attributes($),

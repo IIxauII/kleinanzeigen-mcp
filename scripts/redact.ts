@@ -64,5 +64,7 @@ export function redactor() {
      */
     shopSlug: (index: number): string => `Synthetisches-Musterhaus-GmbH-${index}`,
     userId: (index: number): string => String(21000000 + index),
+    /** A location id is the only valid handle for a location, so it is as exact as a place name. */
+    locationId: (index: number): string => String(4000 + index),
   };
 }

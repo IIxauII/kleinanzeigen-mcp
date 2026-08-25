@@ -19,7 +19,8 @@ export type SellerType = (typeof SELLER_TYPES)[number];
  * The observable listing states, as **three flags rather than an enum**
  * (SPEC 3.4).
  *
- * `CONTEXT.md` names four site-side states; this is the narrower set a
+ * `CONTEXT.md` names the site-side states — Active, Reserved, Expired, Paused
+ * and Deleted, with Sold explicitly not among them. This is the narrower set a
  * logged-out reader can actually see:
  *
  * - **Active has no member.** It is observable only as the absence of
@@ -75,6 +76,13 @@ export const ListingSchema = z.object({
   title: z.string(),
   description: z.string(),
   price: PriceSchema,
+  /**
+   * **No `old_price`.** §3.3's shape carries one, and this surface never
+   * renders it: a price drop is markup on a *search row*, and the only
+   * struck-through prices on a detail page belong to the other listings at the
+   * foot of it. An optional field that can never be populated would promise a
+   * reading the page does not have.
+   */
   category_id: z.number().int().positive().nullable(),
   /** **The third number in a listing URL is the location id**, never a user id (SPEC 3.3). */
   location_id: z.number().int().positive().nullable(),

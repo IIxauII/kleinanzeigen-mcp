@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { text, type Selection } from "../dom.ts";
 import { ParseError } from "../fetch/errors.ts";
 import { parsePostingDate } from "./posting-date.ts";
 import { parsePrice } from "./price.ts";
@@ -26,9 +27,6 @@ export type ParseOptions = {
   now?: Date;
 };
 
-/** One cheerio selection — `Cheerio<Element>`, spelled without reaching past cheerio into `domhandler`. */
-type Selection = ReturnType<ReturnType<cheerio.CheerioAPI["root"]>["find"]>;
-
 /**
  * `N - M von T`, and **the numbers only**.
  *
@@ -50,8 +48,6 @@ const SUMMARY = /(\d[\d.]*)\s*-\s*(\d[\d.]*)\s+von\s+(\d[\d.]*)/u;
  * failure instead of a quiet "nothing matched" (SPEC 5.8).
  */
 const NO_RESULTS = /Es wurden keine Ergebnisse/u;
-
-const text = (node: Selection): string => collapse(node.text());
 
 /** `13353 Wedding (3 km)`, or `14482 Potsdam (ca. 20 km)`, or neither half of it. */
 function parseWhere(rendered: string): {

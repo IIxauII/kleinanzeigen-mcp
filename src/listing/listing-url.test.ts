@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GetListingArgsSchema, isListingDetailUrl, listingUrl } from "./listing-url.ts";
+import { GetListingArgsSchema, listingUrl, readFinalUrl } from "./listing-url.ts";
 
 describe("the listing detail URL", () => {
   it("is the ad id alone, with a stand-in for the cosmetic slug", () => {
@@ -29,22 +29,29 @@ describe("the argument the caller passes", () => {
 });
 
 describe("the deleted-ad guard's reading of a final URL", () => {
-  it("accepts a listing detail URL, in either of the forms the site serves", () => {
-    expect(isListingDetailUrl("https://www.kleinanzeigen.de/s-anzeige/x/3490780801")).toBe(true);
-    expect(isListingDetailUrl("https://www.kleinanzeigen.de/s-anzeige/ein-slug/3490780801-217-4070")).toBe(true);
+  it("reads a listing detail URL, in either of the forms the site serves", () => {
+    expect(readFinalUrl("https://www.kleinanzeigen.de/s-anzeige/x/3490780801")).toBe("listing");
+    expect(readFinalUrl("https://www.kleinanzeigen.de/s-anzeige/ein-slug/3490780801-217-4070")).toBe("listing");
   });
 
-  it("refuses every page a missing listing is redirected to", () => {
+  it("reads the site's apex host as the site, not as a listing that is gone", () => {
+    // A redirect that comes to rest there has still served the listing.
+    expect(readFinalUrl("https://kleinanzeigen.de/s-anzeige/x/3490780801")).toBe("listing");
+  });
+
+  it("reads every page a missing listing is redirected to as not a listing", () => {
     // Neither answers 404 and neither leaves a tombstone: one is a browse page
     // synthesised from the URL's own codes, the other is the homepage
     // (SPEC 5.3).
-    expect(isListingDetailUrl("https://www.kleinanzeigen.de/s-fahrraeder/weisswasser/c217l4069")).toBe(false);
-    expect(isListingDetailUrl("https://www.kleinanzeigen.de/")).toBe(false);
+    expect(readFinalUrl("https://www.kleinanzeigen.de/s-fahrraeder/weisswasser/c217l4069")).toBe("not-a-listing");
+    expect(readFinalUrl("https://www.kleinanzeigen.de/")).toBe("not-a-listing");
+    expect(readFinalUrl("https://kleinanzeigen.de/")).toBe("not-a-listing");
   });
 
-  it("refuses a listing path that is not on the site's own origin", () => {
-    expect(isListingDetailUrl("https://kleinanzeigen.de.example.com/s-anzeige/x/3490780801")).toBe(false);
-    expect(isListingDetailUrl("/s-anzeige/x/3490780801")).toBe(false);
-    expect(isListingDetailUrl("")).toBe(false);
+  it("reads anywhere else as unreadable, which is a failure and never an answer", () => {
+    // "We could not tell" must not arrive as "this listing is gone".
+    expect(readFinalUrl("https://kleinanzeigen.de.example.com/s-anzeige/x/3490780801")).toBe("unreadable");
+    expect(readFinalUrl("/s-anzeige/x/3490780801")).toBe("unreadable");
+    expect(readFinalUrl("")).toBe("unreadable");
   });
 });
