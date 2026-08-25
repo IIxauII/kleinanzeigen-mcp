@@ -216,8 +216,11 @@ function reportDrift(file: CityDatasetFile): void {
     note(`no drift: the same ${after.size} locations, same names`);
     return;
   }
-  if (added.length > 0) note(`added ${added.length}: ${added.slice(0, 10).map((id) => `l${id} ${after.get(id)}`).join(", ")}`);
-  if (removed.length > 0) note(`REMOVED ${removed.length}: ${removed.slice(0, 10).map((id) => `l${id} ${before.get(id)}`).join(", ")}`);
+  const sample = (ids: number[], names: Map<number, string>) =>
+    ids.slice(0, 10).map((id) => `l${id} ${names.get(id)}`).join(", ");
+
+  if (added.length > 0) note(`added ${added.length}: ${sample(added, after)}`);
+  if (removed.length > 0) note(`REMOVED ${removed.length}: ${sample(removed, before)}`);
   for (const [id, name] of renamed.slice(0, 10)) note(`renamed: l${id} ${before.get(id)} → ${name}`);
 }
 

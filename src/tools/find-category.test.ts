@@ -16,7 +16,7 @@ async function connect(readCategoryTree?: () => CategoryTree): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
   await Promise.all([
-    createServer(readCategoryTree).connect(serverTransport),
+    createServer({ readCategoryTree }).connect(serverTransport),
     client.connect(clientTransport),
   ]);
   return client;

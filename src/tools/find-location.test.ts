@@ -16,7 +16,7 @@ async function connect(readCityDataset?: () => CityDataset): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
   await Promise.all([
-    createServer(undefined, readCityDataset).connect(serverTransport),
+    createServer({ readCityDataset }).connect(serverTransport),
     client.connect(clientTransport),
   ]);
   return client;
