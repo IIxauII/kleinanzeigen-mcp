@@ -1,20 +1,5 @@
+import { foldedMatch } from "../fold.ts";
 import type { CategoryNode, CategoryTree } from "./category-tree.ts";
-
-/**
- * Case- and diacritic-insensitive folding. Runs of whitespace collapse so that
- * copied labels match, and nothing else is normalised: there is no fuzzy or
- * edit-distance matching anywhere here (SPEC 4.4). 159 known strings and an LLM
- * caller — approximate matching buys little and turns a loud failure into a
- * quiet one.
- */
-export function foldForMatch(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .toLowerCase()
-    .replace(/\s+/gu, " ")
-    .trim();
-}
 
 /** The qualified `"Parent > Child"` form; a top-level category is just its name. */
 export function qualifiedName(node: CategoryNode): string {
@@ -29,9 +14,7 @@ export function qualifiedName(node: CategoryNode): string {
  * Zero matches is an answer, not an error.
  */
 export function findCategories(tree: CategoryTree, query: string): CategoryNode[] {
-  const needle = foldForMatch(query);
-  if (needle === "") return [];
   return tree.filter(
-    (node) => foldForMatch(node.name) === needle || foldForMatch(qualifiedName(node)) === needle,
+    (node) => foldedMatch(query, node.name) || foldedMatch(query, qualifiedName(node)),
   );
 }

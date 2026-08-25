@@ -18,10 +18,11 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
     return client;
   }
 
-  it("lists find_category", async () => {
+  it("lists the zero-request resolvers", async () => {
     const client = await spawn();
     try {
-      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(["find_category"]);
+      expect((await client.listTools()).tools.map((tool) => tool.name)) //
+        .toEqual(["find_category", "find_location"]);
     } finally {
       await client.close();
     }
@@ -46,6 +47,32 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
             path: "/s-bahn-oepnv/c286",
             parent_id: 231,
             parent_name: "Eintrittskarten & Tickets",
+          },
+        ],
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("resolves a location against the sidecar dataset", async () => {
+    const client = await spawn();
+    try {
+      const result = await client.callTool({
+        name: "find_location",
+        arguments: { query: "koeln" },
+      });
+      expect(result.structuredContent).toMatchObject({
+        count: 1,
+        stale: false,
+        source_url: null,
+        matches: [
+          {
+            location_id: 945,
+            name: "Köln",
+            slug: "koeln",
+            level: "locality",
+            state: "Nordrhein-Westfalen",
           },
         ],
       });

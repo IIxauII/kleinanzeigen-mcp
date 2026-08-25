@@ -475,6 +475,10 @@ Matching is **case- and diacritic-insensitive** against the name and against a q
 
 Zero matches is `{ matches: [], count: 0 }` — an answer.
 
+> **Correction ([#18](https://github.com/IIxauII/kleinanzeigen-mcp/issues/18)).** `find_location`'s description above promises more than the dataset can keep: **a postcode matches nothing**, because the postcode layer's ids are absent from every allowed source (§7's correction). It is left verbatim because a shipped description is a contract, and the shortfall is recorded here, in the tool's input schema, and in [ADR-0004](./docs/adr/0004-the-city-dataset-has-two-sources.md) rather than silently reworded. A postcode remains usable as §4.1's free-text `location`.
+>
+> Matching also folds **`ä ö ü ß` to `ae oe ue ss`** alongside the plain diacritic strip, so `Köln`, `Koln` and `koeln` all reach `Köln`. This is transliteration, and §4.5's "never transliterate" does not reach it: that rule governs the caller's string on its way to a **live `fulltext` query**, where the site's own umlaut handling is uncharacterised. Here both sides of a local comparison are folded identically, the fold is exact rather than approximate, and the site spells its own location slugs this way. The expansion runs **one way only** — nothing contracts `ue` back to `ü`.
+
 **Descriptions**
 
 ```
@@ -690,6 +694,8 @@ Reading is not writing; ADR-0002's invariant is untouched.
 **Category tree provenance.** The sitemap's id set is **byte-identical** to the disallowed `/s-kategorie-baum.html` tree — 159 ids, zero added, zero missing — and it is depth-first, so partitioning at the 15 L1 markers recovers every parent's child set exactly. The homepage nav confirms the same 15 partitions independently but **silently omits 3 of 159 nodes** (`c286 Bahn & ÖPNV`, `c269 Beauty & Gesundheit`, `c273 Tauschen`) — absent from the HTML, not collapsed behind a toggle. **Only the sitemap is complete; the homepage is a label convenience, not a source of truth.** The 3 missing labels are recovered from their parents' browse pages.
 
 **City dataset gaps, hard-coded.** `sitemap_cities.xml` omits the three city-states — Berlin `l3331`, Hamburg `l9409`, Bremen `l1` — which appear only as `/stadt/` landing pages. **Hard-code those three ids.** Also absent: sub-Ortsteile (e.g. Wedding `l3503`) and the entire postcode layer, whose ids are unobtainable from any allowed source. Postcodes still work as input, via `?locationStr=`.
+
+> **Correction, recorded while building `find_location` ([#18](https://github.com/IIxauII/kleinanzeigen-mcp/issues/18)).** Two claims above do not survive contact with the data. The sitemap withholds **140** ids, not 3: the three city-states plus **137 major cities** — Köln `l945`, München `l6411`, Dortmund, Düsseldorf, Stuttgart — which likewise appear only as `/stadt/` landing pages. And the sitemap carries **no names, levels or states**, so it cannot alone produce three of the five fields §4.4 returns. The shipped dataset is generated from the sitemap **and** the allowed `/s-katalog-orte.html` catalogue (17 build-time requests), holds the tree's first two tiers — 16 federal states + 11 215 localities = **11 231** locations — and measures **139 KB gzipped**, not ~84 KB, because that budget was measured on slugs and ids alone. Reasoning and the exact reconciliation: [ADR-0004](./docs/adr/0004-the-city-dataset-has-two-sources.md).
 
 **A location id implies its whole subtree** — verified across Berlin, Schleswig-Holstein and Kr. München. No searching each district separately.
 

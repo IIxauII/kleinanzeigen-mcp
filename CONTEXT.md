@@ -101,13 +101,20 @@ A node in kleinanzeigen's own location tree, identified by a numeric location id
 The numeric identifier of a location, written `l3331`. As with categories, the only valid handle: names and postcodes can each map to several locations.
 
 **Postcode** _(PLZ)_:
-A German five-digit postcode. Resolves to one *or more* locations, so it is not an identifier.
+A German five-digit postcode. Resolves to one *or more* locations, so it is not an identifier. The postcode layer's ids are unobtainable, so a postcode is **search input, never a resolvable location**: `find_location` answers one with zero matches, and it reaches the site only as free text the site resolves for itself.
 
 **Radius** _(Umkreis)_:
 The distance in km searched around a location. Zero means the location itself.
 
 **Federal state** _(Bundesland)_:
-The top level of the location tree; sixteen exist.
+The top tier of the location tree; sixteen exist. Berlin, Hamburg and Bremen are federal states *and* cities, which is why they carry a city's id.
+
+**Locality** _(Ort, Gemeinde, Stadtteil)_:
+Any location one tier below a federal state — the second and last tier the bundled dataset carries. Deliberately not "city" or "municipality": the tier holds Gemeinden, Städte, five `Kr.` Kreis nodes and, under the three city-states, their Ortsteile, and no civic rank covers all of them.
+_Avoid_: City, town, municipality, place
+
+**Sub-Ortsteil**:
+A location below a locality — Wedding `l3503` under Berlin's Mitte, or any Ortsteil of the 137 major cities. Real on the site, and **unresolvable here**: its id appears in no allowed source. See [ADR-0004](./docs/adr/0004-the-city-dataset-has-two-sources.md).
 
 ### Seller
 
