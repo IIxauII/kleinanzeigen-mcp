@@ -12,7 +12,17 @@ export default defineConfig({
   target: "node22",
   clean: true,
   noExternal: [/.*/],
-  banner: { js: "#!/usr/bin/env node" },
+  // cheerio's HTML decoding reaches `require("buffer")` through `safer-buffer`,
+  // and esbuild's ESM output otherwise answers that with a throw. Handing the
+  // bundle a real `require` resolves it to the Node builtin — the shim the
+  // bundle already emits picks this up by name (SPEC 8.2).
+  banner: {
+    js: [
+      "#!/usr/bin/env node",
+      'import { createRequire as __createRequire } from "node:module";',
+      "var require = __createRequire(import.meta.url);",
+    ].join("\n"),
+  },
   onSuccess: async () => {
     copyFileSync("data/category-tree.json", "dist/category-tree.json");
     copyFileSync("data/cities.json", "dist/cities.json");
