@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FIND_CATEGORY_DESCRIPTION } from "./find-category.ts";
 import { FIND_LOCATION_DESCRIPTION } from "./find-location.ts";
+import { GET_LISTING_DESCRIPTION } from "./get-listing.ts";
 import { SEARCH_LISTINGS_DESCRIPTION } from "./search-listings.ts";
 
 const SPEC = new URL("../../SPEC.md", import.meta.url);
@@ -26,12 +27,12 @@ function resolverDescriptionInSpec(tool: string): string {
     .join("\n");
 }
 
-/** §4.1 gives `search_listings`' description as a fence of its own, unindented. */
-function searchDescriptionInSpec(): string {
-  const section = /### 4\.1 `search_listings`\n([\s\S]*?)\n### /u.exec(spec());
-  if (section === null) throw new Error("SPEC 4.1 no longer describes search_listings");
-  const block = /\*\*Description\*\*\n\n```\n([\s\S]*?)\n```/u.exec(section[1]!);
-  if (block === null) throw new Error("SPEC 4.1 no longer gives a description block");
+/** §4.1 and §4.2 each give their tool's description as a fence of its own, unindented. */
+function descriptionInSpec(section: string, tool: string): string {
+  const body = new RegExp(`### ${section.replace(".", "\\.")} \`${tool}\`\\n([\\s\\S]*?)\\n### `, "u").exec(spec());
+  if (body === null) throw new Error(`SPEC ${section} no longer describes ${tool}`);
+  const block = /\*\*Description\*\*\n\n```\n([\s\S]*?)\n```/u.exec(body[1]!);
+  if (block === null) throw new Error(`SPEC ${section} no longer gives a description block`);
   return block[1]!;
 }
 
@@ -42,6 +43,10 @@ describe("the tool descriptions", () => {
   });
 
   it("are search_listings' from SPEC 4.1, verbatim", () => {
-    expect(SEARCH_LISTINGS_DESCRIPTION).toBe(searchDescriptionInSpec());
+    expect(SEARCH_LISTINGS_DESCRIPTION).toBe(descriptionInSpec("4.1", "search_listings"));
+  });
+
+  it("are get_listing's from SPEC 4.2, verbatim", () => {
+    expect(GET_LISTING_DESCRIPTION).toBe(descriptionInSpec("4.2", "get_listing"));
   });
 });
