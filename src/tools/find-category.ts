@@ -2,7 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { CategoryNodeSchema, type CategoryTree } from "../categories/category-tree.ts";
 import { findCategories } from "../categories/find-categories.ts";
+import { ENVELOPE_OUTPUT_SHAPE, localEnvelope } from "../envelope.ts";
 import { log } from "../logging.ts";
+import { toolResult } from "./tool-result.ts";
 
 /** SPEC 4.4, verbatim. */
 export const FIND_CATEGORY_DESCRIPTION =
@@ -13,6 +15,7 @@ const inputSchema = {
 };
 
 const outputSchema = {
+  ...ENVELOPE_OUTPUT_SHAPE,
   matches: z.array(CategoryNodeSchema),
   count: z.number().int().nonnegative(),
 };
@@ -30,12 +33,13 @@ export function registerFindCategory(server: McpServer, readCategoryTree: () => 
     { description: FIND_CATEGORY_DESCRIPTION, inputSchema, outputSchema },
     ({ query }) => {
       const matches = findCategories(readCategoryTree(), query);
-      const result = { matches, count: matches.length };
+      // The envelope rides on every result, request or no request: `fetched_at`
+      // is uniform so a caller can reason about recency without knowing which
+      // tools fetch, and `source_url` is null here because none was read
+      // (SPEC 3.6).
+      const result = { ...localEnvelope(), matches, count: matches.length };
       log("find_category", { count: result.count });
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(result) }],
-        structuredContent: result,
-      };
+      return toolResult(result);
     },
   );
 }
