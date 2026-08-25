@@ -142,7 +142,14 @@ Every listing one seller currently has online. Distinct from the count of listin
 A commercial seller's public page, at `/pro/<slug>`, carrying their profile and their inventory. Private sellers have none.
 
 **Shop slug** _(Unternehmensseiten-Slug)_:
-The text handle addressing a shop page. Unlike a category or a location, where only a numeric id identifies a node, the slug is the shop page's own address — but it is a second handle, not a replacement for the seller id. It is case-sensitive and may carry a numeric suffix where two shops share a name (`Autohaus-Meyer-GmbH` and `autohaus-meyer-gmbh-1` are different sellers), so it is never normalised.
+The text handle addressing a shop page. Unlike a category or a location, where only a numeric id identifies a node, the slug is the shop page's own address — but it is a second handle, not a replacement for the seller id. It is case-sensitive and may carry a numeric suffix where two shops share a name (`Autohaus-Meyer-GmbH` and `autohaus-meyer-gmbh-1` are different sellers), so it is never normalised. The site itself resolves a slug case-insensitively and echoes back whichever spelling it was given; that is not licence to normalise one, because it is the **suffix** that separates two sellers, not the case.
+
+**Ads online** _(Anzeigen online)_:
+The number of listings a shop page states it currently has. One of at least three shop counts that do not reconcile — the shop page's, the shop directory's, and the "listings ever posted" figure the same page shows — with no known authority among them. So it is reported as the site states it and is never promised to equal the listings actually returned.
+_Avoid_: Inventory size, total listings
+
+**Shop category breakdown** _(Kategorieübersicht der Unternehmensseite)_:
+A shop surface's count of listings per category, published beside the listings themselves. It describes the **query that was answered**, not the shop: unfiltered it names top-level categories and sums exactly to *Ads online*; under a category filter it names that category's subcategories and sums to the filtered set.
 
 **Shop directory** _(Unternehmensseitenverzeichnis)_:
 Kleinanzeigen's public index of shop pages. The way to resolve a commercial seller's name to a shop slug.

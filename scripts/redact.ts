@@ -64,6 +64,10 @@ export function redactor() {
      */
     shopSlug: (index: number): string => `Synthetisches-Musterhaus-GmbH-${index}`,
     userId: (index: number): string => String(21000000 + index),
+    /** A shop's rendered company name, which is a business's and not a person's. */
+    shopName: (index: number): string => `Synthetisches Musterhaus GmbH ${index}`,
+    /** A shop's own id, distinct from the seller id the same page carries. */
+    storeId: (index: number): string => String(60000 + index),
     /** A location id is the only valid handle for a location, so it is as exact as a place name. */
     locationId: (index: number): string => String(4000 + index),
   };
