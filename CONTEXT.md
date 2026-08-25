@@ -156,7 +156,6 @@ Kleinanzeigen's public index of shop pages. The way to resolve a commercial sell
 
 **Shop candidate** _(Unternehmensseiten-Treffer)_:
 One hit from a *shop directory* search: a shop's name, *shop slug*, *seller id*, location and *ads online*, and nothing else. Deliberately thinner than the profile a *shop page* carries, because it exists to be **chosen between** rather than used — the directory's full-text search matches a shop's profile prose as well as its name, so even a lone exact hit is a candidate and never a selection. The location it carries is free text the directory renders, never a *location id*.
-_Avoid_: Shop match, shop result
 
 **Member since** _(Aktiv seit)_:
 The date a seller's account was created.

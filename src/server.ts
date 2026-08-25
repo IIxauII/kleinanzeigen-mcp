@@ -35,6 +35,6 @@ export function createServer({
   registerGetShop(server);
   registerFindCategory(server, readCategoryTree);
   registerFindLocation(server, readCityDataset);
-  registerFindShop(server, readCategoryTree, readCityDataset);
+  registerFindShop(server, readCategoryTree);
   return server;
 }

@@ -68,8 +68,8 @@ function readSlug(urlExtension: string, what: string): string {
  * stand-in and rather than a failure.
  */
 function readCandidate(value: unknown, index: number): ShopCandidate {
-  const card = record(value, `directory candidate ${index}`);
   const what = `directory candidate ${index}`;
+  const card = record(value, what);
   return {
     name: string(card, "title", what),
     shop_slug: readSlug(string(card, "urlExtension", what), what),

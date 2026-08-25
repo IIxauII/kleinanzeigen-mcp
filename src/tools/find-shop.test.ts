@@ -148,7 +148,7 @@ describe("find_shop over MCP", () => {
     expect(sent[0]!.body).toMatchObject({ pageSize: 50, view: "CARD", searchScope: "BOTH" });
   });
 
-  it("validates the two filter ids against the bundled trees, at no request", async () => {
+  it("validates the category id against the bundled tree, at no request", async () => {
     const client = await connect(site("shop-directory"));
     const refused = await client.callTool({ name: "find_shop", arguments: { name: "x", category_id: 999 } });
     expect(refused.isError).toBe(true);
@@ -157,6 +157,13 @@ describe("find_shop over MCP", () => {
 
     await find(client, { name: "x", category_id: 210, location_id: 3331 });
     expect(sent[0]!.body).toMatchObject({ categoryId: 210, locationId: 3331 });
+  });
+
+  it("refuses an empty name rather than asking for the whole directory", async () => {
+    const client = await connect(site("shop-directory"));
+    const refused = await client.callTool({ name: "find_shop", arguments: { name: "" } });
+    expect(refused.isError).toBe(true);
+    expect(sent).toHaveLength(0);
   });
 
   it("reads no bundled dataset for a name-only lookup", async () => {

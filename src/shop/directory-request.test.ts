@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { CategoryTree } from "../categories/category-tree.ts";
-import type { CityDataset } from "../locations/city-dataset.ts";
 import {
   DIRECTORY_PAGE_SIZE,
   directoryRequest,
@@ -12,19 +11,12 @@ const TREE: CategoryTree = [
   { category_id: 210, name: "Auto, Rad & Boot", slug: "auto-rad-boot", path: "auto-rad-boot", parent_id: null, parent_name: null },
 ];
 
-const CITIES: CityDataset = [
-  { location_id: 3331, name: "Köln", slug: "koeln", level: "locality", state: "Nordrhein-Westfalen" },
-];
-
 /** A reader that fails the test if it is read at all — laziness is the assertion. */
 const never = <T>(what: string) => (): T => {
   throw new Error(`the ${what} was read`);
 };
 
-const schema = (readCategoryTree = () => TREE, readCityDataset = () => CITIES) =>
-  findShopArgsSchema(readCategoryTree, readCityDataset);
-
-const parse = (args: unknown): FindShopArgs => schema().parse(args);
+const parse = (args: unknown): FindShopArgs => findShopArgsSchema(() => TREE).parse(args);
 
 describe("find_shop's arguments", () => {
   it("refuses an argument the surface does not have, rather than ignoring it", () => {
@@ -38,7 +30,7 @@ describe("find_shop's arguments", () => {
     expect(() => parse({ name: "" })).toThrow();
   });
 
-  it("accepts an id the bundled trees know", () => {
+  it("accepts a category id the bundled tree knows", () => {
     expect(parse({ name: "x", category_id: 210, location_id: 3331 })).toEqual({
       name: "x",
       category_id: 210,
@@ -46,19 +38,23 @@ describe("find_shop's arguments", () => {
     });
   });
 
-  it("refuses an id no bundled tree has, before a request is spent on it", () => {
+  it("refuses a category id the bundled tree does not have, before a request is spent on it", () => {
     expect(() => parse({ name: "x", category_id: 999 })).toThrow(/find_category/u);
-    expect(() => parse({ name: "x", location_id: 999 })).toThrow(/find_location/u);
   });
 
-  it("reads neither bundled dataset when neither id was given", () => {
-    const lazy = findShopArgsSchema(never<CategoryTree>("category tree"), never<CityDataset>("city dataset"));
+  it("passes a location id the bundled dataset does not have straight through", () => {
+    // The city dataset holds the tree's first two tiers only: sub-Ortsteile
+    // like Wedding `l3503` are absent from every allowed source, and the
+    // directory filters by them and answers honestly (SPEC 7's correction).
+    // Refusing one would be the opposite of the failure the category check
+    // exists to prevent.
+    expect(parse({ name: "x", location_id: 3503 })).toEqual({ name: "x", location_id: 3503 });
+  });
+
+  it("reads the bundled tree only when a category id was given", () => {
+    const lazy = findShopArgsSchema(never<CategoryTree>("category tree"));
     expect(lazy.parse({ name: "decathlon", page: 3 })).toEqual({ name: "decathlon", page: 3 });
-  });
-
-  it("reads only the dataset the id it was given belongs to", () => {
-    const onlyCategory = findShopArgsSchema(() => TREE, never<CityDataset>("city dataset"));
-    expect(onlyCategory.parse({ name: "x", category_id: 210 })).toEqual({ name: "x", category_id: 210 });
+    expect(lazy.parse({ name: "x", location_id: 3331 })).toEqual({ name: "x", location_id: 3331 });
   });
 
   it("takes a 1-based page and refuses page 0", () => {

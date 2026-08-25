@@ -3,7 +3,6 @@ import { z } from "zod";
 import type { CategoryTree } from "../categories/category-tree.ts";
 import { ENVELOPE_OUTPUT_SHAPE } from "../envelope.ts";
 import { getFetchCore } from "../fetch/core.ts";
-import type { CityDataset } from "../locations/city-dataset.ts";
 import { log } from "../logging.ts";
 import {
   DIRECTORY_PAGE_SIZE,
@@ -57,24 +56,21 @@ export type FindShopResult = z.infer<typeof OutputSchema>;
  * shops would be 1 077 requests — precisely the crawl the AGB describes
  * (SPEC 1, 7).
  *
- * Both bundled trees are still read here, at zero request cost, to check the
- * two filter ids before a request is spent on one the taxonomy does not have —
- * and neither is touched by a name-only lookup (SPEC 7).
+ * The bundled category tree is still read here, at zero request cost, to check
+ * `category_id` before a request is spent on one the taxonomy does not have —
+ * and it is not touched by a name-only lookup (SPEC 7). `location_id` gets no
+ * such check: see `directory-request.ts` for why the city dataset cannot back
+ * one.
  */
-export function registerFindShop(
-  server: McpServer,
-  readCategoryTree: () => CategoryTree,
-  readCityDataset: () => CityDataset,
-): void {
+export function registerFindShop(server: McpServer, readCategoryTree: () => CategoryTree): void {
   server.registerTool(
     "find_shop",
     {
       description: FIND_SHOP_DESCRIPTION,
-      inputSchema: findShopArgsSchema(readCategoryTree, readCityDataset),
+      inputSchema: findShopArgsSchema(readCategoryTree),
       outputSchema: OutputSchema.shape,
     },
     async (args: FindShopArgs) => {
-      const page = args.page ?? 1;
       const request = directoryRequest(args);
       try {
         const { data, envelope } = await getFetchCore().fetch(
@@ -82,14 +78,14 @@ export function registerFindShop(
           (body) => parseShopDirectory(body),
           request.body,
         );
-        const result = { ...envelope, ...data, page, page_size: DIRECTORY_PAGE_SIZE } as const;
+        const result = { ...envelope, ...data, page: request.page, page_size: DIRECTORY_PAGE_SIZE } as const;
         // **No name.** §6.4 keeps seller names out of the log, and the string
         // this tool searches on is a seller's name — `search_listings` logs
         // neither its keyword nor its location for the same reason. The
         // `fetch` line's URL is the permitted metadata, and it carries no
         // query: the parameters ride the POST body.
         log("find_shop", {
-          page,
+          page: request.page,
           matches: result.matches.length,
           count: result.count,
           stale: result.stale,
