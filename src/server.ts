@@ -3,6 +3,7 @@ import { loadCategoryTree, type CategoryTree } from "./categories/category-tree.
 import { loadCityDataset, type CityDataset } from "./locations/city-dataset.ts";
 import { registerFindCategory } from "./tools/find-category.ts";
 import { registerFindLocation } from "./tools/find-location.ts";
+import { registerSearchListings } from "./tools/search-listings.ts";
 import { VERSION } from "./version.ts";
 
 /**
@@ -26,6 +27,7 @@ export function createServer({
     { name: "kleinanzeigen-mcp", version: VERSION },
     { capabilities: { tools: {} } },
   );
+  registerSearchListings(server, readCityDataset);
   registerFindCategory(server, readCategoryTree);
   registerFindLocation(server, readCityDataset);
   return server;
