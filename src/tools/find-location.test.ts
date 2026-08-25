@@ -93,6 +93,25 @@ describe("find_location over MCP", () => {
     }
   });
 
+  it("hands back both spellings the site itself carries, never one of them", async () => {
+    // The site lists Füssen l9915 and Fuessen l9747 as two distinct Bayern
+    // locations sharing one slug. Expanding ä ö ü brings them together under
+    // either spelling, which is the always-a-list contract earning its keep:
+    // the caller sees two ids and picks, instead of silently getting one.
+    const client = await connect(dataset);
+    for (const query of ["Füssen", "Fuessen"]) {
+      const result = await findLocation(client, query);
+      expect(result.matches.map((match) => match.location_id).sort()).toEqual([9747, 9915]);
+    }
+
+    // The expansion runs one way only. `Fussen` strips a mark and so reaches
+    // Füssen, but nothing contracts `ue` back to `ü` — that guess is wrong far
+    // more often than right (Neuss, Neuenkirchen, Duisburg), and a resolver
+    // that guesses is the thing this whole surface is built to avoid.
+    const stripped = await findLocation(client, "Fussen");
+    expect(stripped.matches.map((match) => match.location_id)).toEqual([9915]);
+  });
+
   it("answers a postcode with an empty list — an answer, not an error", async () => {
     const result = await findLocation(await connect(dataset), "10115");
     expect(result).toMatchObject({ matches: [], count: 0 });
