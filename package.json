@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "generate:category-tree": "node scripts/generate-category-tree.ts"
+    "generate:category-tree": "node scripts/generate-category-tree.ts",
+    "generate:cities": "node scripts/generate-cities.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
