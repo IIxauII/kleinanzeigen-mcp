@@ -57,26 +57,26 @@ const integer = (source: Record<string, unknown>, key: string, what: string): nu
  * without one (SPEC 5.8).
  */
 function readRow(value: unknown, index: number, now?: Date): ShopRow {
-  const ad = record(value, `shop listing ${index}`);
-  const ad_id = String(integer(ad, "id", `shop listing ${index}`));
+  const listing = record(value, `shop listing ${index}`);
+  const ad_id = String(integer(listing, "id", `shop listing ${index}`));
   const what = `shop listing ${ad_id}`;
-  const price = ad["price"];
+  const price = listing["price"];
   if (price !== undefined && typeof price !== "string") throw new ParseError(`${what} has an unreadable price`);
-  const tags = ad["tags"];
+  const tags = listing["tags"];
   if (tags !== undefined && !Array.isArray(tags)) throw new ParseError(`${what} has unreadable tags`);
   return {
     ad_id,
-    url: new URL(string(ad, "url", what), ORIGIN).toString(),
-    title: string(ad, "title", what),
-    description: string(ad, "description", what),
+    url: new URL(string(listing, "url", what), ORIGIN).toString(),
+    title: string(listing, "title", what),
+    description: string(listing, "description", what),
     // `parsePrice` reads the rendered string, and the empty one it treats as
     // Unpriced is the same state the shop payload spells by leaving the field
     // out entirely.
     price: parsePrice(price ?? ""),
-    location_name: string(ad, "location", what),
-    posted: parsePostingDate(string(ad, "date", what), now),
-    thumbnail: string(ad, "image", what),
-    image_count: integer(ad, "imageCount", what),
+    location_name: string(listing, "location", what),
+    posted: parsePostingDate(string(listing, "date", what), now),
+    thumbnail: string(listing, "image", what),
+    image_count: integer(listing, "imageCount", what),
     tags: (tags ?? []).map((tag, position) => {
       if (typeof tag !== "string") throw new ParseError(`${what} tag ${position} is not a string`);
       return tag;

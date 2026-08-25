@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { ParseError } from "../fetch/errors.ts";
-import { SITE_HOSTS } from "../search/search-url.ts";
 import { islandProps } from "./island-props.ts";
+import { readFinalUrl } from "./shop-request.ts";
 import { readShopAds } from "./shop-ads.ts";
 import type { Shop, ShopRow } from "./shop.ts";
 
@@ -32,8 +32,6 @@ export type ParseShopPageOptions = {
  */
 export type ShopPage = { status: "ok"; shop: Shop; listings: ShopRow[] } | { status: "gone" };
 
-const SHOP_PATH = "/pro/";
-
 /** The island that carries the inventory and most of the profile. */
 const PROFILE_ISLAND = "BrandProfilePage";
 
@@ -53,9 +51,17 @@ const optionalString = (value: unknown): string | null =>
  * `storeId` arrives as a string here and as a number nowhere — and it is *not*
  * the seller id, though the contact island labels it `sellerId`. That
  * mislabelling is the reason this reads only the profile island's spelling.
+ *
+ * **Absent is `null`; anything else is loud.** A shop without a store id is a
+ * real shape, and `undefined` is how the page spells it. A `storeId` that
+ * arrives as a *number* would be the encoding having moved, and reporting that
+ * as "this shop has none" is exactly the silence §5.8 forbids.
  */
 function readStoreId(value: unknown): number | null {
-  if (typeof value !== "string" || !/^\d+$/u.test(value)) return null;
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !/^\d+$/u.test(value)) {
+    throw new ParseError(`the shop states an unreadable storeId ${JSON.stringify(value)}`);
+  }
   const id = Number(value);
   return id > 0 ? id : null;
 }
@@ -67,19 +73,13 @@ function readAbout(value: unknown): string | null {
 }
 
 export function parseShopPage(body: string, { finalUrl, now }: ParseShopPageOptions): ShopPage {
-  let host: string;
-  let path: string;
-  try {
-    ({ host, pathname: path } = new URL(finalUrl));
-  } catch {
-    throw new ParseError(`the shop page came to rest at an unreadable URL ${JSON.stringify(finalUrl)}`);
-  }
   // A response that cannot say where it ended up is a **failure**, never a
   // `gone`: only "we looked, and it is not a shop page" is an answer (SPEC 5.3).
-  if (!SITE_HOSTS.has(host)) {
-    throw new ParseError(`the shop page came to rest on ${host}, which is not the site`);
+  const landed = readFinalUrl(finalUrl);
+  if (landed === "unreadable") {
+    throw new ParseError(`the shop page came to rest at ${JSON.stringify(finalUrl)}, which is not the site`);
   }
-  if (!path.startsWith(SHOP_PATH)) return { status: "gone" };
+  if (landed === "not-a-shop") return { status: "gone" };
 
   const $ = cheerio.load(body);
   const profile = islandProps($, PROFILE_ISLAND);
@@ -89,9 +89,14 @@ export function parseShopPage(body: string, { finalUrl, now }: ParseShopPageOpti
   if (typeof seller_id !== "number" || !Number.isInteger(seller_id) || seller_id <= 0) {
     return { status: "gone" };
   }
-  // Belt and braces on the same reading: a real shop page says `commercial`,
-  // and the page a missing shop synthesises says `private`.
-  if (profile["sellerType"] !== COMMERCIAL) return { status: "gone" };
+  // A page that names a seller and then denies they are commercial is a
+  // contradiction rather than an answer, so it is **loud**. It is deliberately
+  // not a second `gone`: the site changing this string's spelling would then
+  // report every shop as missing, silently, which is the failure §5.8 exists
+  // to keep visible.
+  if (profile["sellerType"] !== COMMERCIAL) {
+    throw new ParseError(`shop ${seller_id} says sellerType ${JSON.stringify(profile["sellerType"])}`);
+  }
 
   const shop_slug = profile["brandName"];
   if (typeof shop_slug !== "string" || shop_slug === "") {
@@ -107,7 +112,16 @@ export function parseShopPage(body: string, { finalUrl, now }: ParseShopPageOpti
   const name = optionalString(actions?.["title"]) ?? optionalString(badges?.["companyName"]);
   if (name === null) throw new ParseError(`shop ${shop_slug} names no company`);
 
-  const { listings, categories } = readShopAds(profile["initialAds"], now);
+  // **A shop with nothing online has no inventory block at all** — the same
+  // `initialAds: null` the missing shop's page carries. Reading it as an empty
+  // inventory is safe only *here*, past the identity guard, and only where the
+  // shop agrees it has nothing: a `null` block on a shop stating listings is
+  // the encoding having moved, and an empty list would hide it (SPEC 5.4, 5.8).
+  const inventory = profile["initialAds"];
+  const { listings, categories } =
+    (inventory === null || inventory === undefined) && ads_online === 0
+      ? { listings: [], categories: [] }
+      : readShopAds(inventory, now);
 
   return {
     status: "ok",

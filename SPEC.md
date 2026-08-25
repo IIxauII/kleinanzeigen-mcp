@@ -489,7 +489,7 @@ The RPC's filters are genuinely server-side, so §2.6's rule admits them. This d
 
 > **Correction, recorded while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)).** **The result shape above outruns what the two shop encodings carry, in three places.** Each was found by decoding live payloads, and each is a field the surface does not have rather than one the parser failed to read.
 >
-> - **`listings` are not `SearchRow`s.** The island and the RPC carry twelve fields per listing between them — `id`, `url`, `title`, `description`, `price`, `date`, `location`, `image`, `retinaImage`, `imageCount`, `hasVirtualTour`, `tags` — and four a `SearchRow` needs are in neither: there is **no shipping tag, no `Gesuch` marker, no postcode and no promoted slot** anywhere on the shop surface. Defaulting them would put `shipping: false` on a listing that ships and `listing_type: "OFFER"` on a want listing, so the tool returns a **`ShopRow`**: the ten fields that are really there, plus the one a search row has no equivalent for — `tags`, the size a clothing or footwear listing is filed under. Absent, not guessed, is the same reading that makes an unreadable seller type unknown rather than private (§3.5).
+> - **`listings` are not `SearchRow`s.** The island and the RPC carry twelve fields per listing between them — `id`, `url`, `title`, `description`, `price`, `date`, `location`, `image`, `retinaImage`, `imageCount`, `hasVirtualTour`, `tags` — and four a `SearchRow` needs are in neither: there is **no shipping tag, no `Gesuch` marker, no postcode and no promoted slot** anywhere on the shop surface. Defaulting them would put `shipping: false` on a listing that ships and `listing_type: "OFFER"` on a want listing, so the tool returns a **`ShopRow`**: the ten of those twelve worth returning, among them the one a search row has no equivalent for — `tags`, the size a clothing or footwear listing is filed under. Absent, not guessed, is the same reading that makes an unreadable seller type unknown rather than private (§3.5). The two left behind are **`retinaImage`**, the same picture at `rule=$_35` rather than `rule=$_2` and derivable from the one returned, and **`hasVirtualTour`**, which was `false` on all 65 listings sampled and has no field on any type here.
 > - **`shop` is `Shop | null`, and is non-null only where the shop page answered.** The profile lives in the page's islands and **the RPC carries none of it** — no name, no seller id, no logo, no prose. The shop page in turn renders one thing only: the shop's first 25 listings, *unfiltered*. So the island answers page 1 with no filters and the RPC answers everything else, and a profile on a deeper or a filtered page would cost a second request behind one call — the hidden multiplier §2.5 refuses. A caller wanting both asks twice, knowingly, at one request each.
 > - **The RPC's price bounds are strings on the wire.** `minPrice`/`maxPrice` are validated as `string` and a numeric bound is refused with HTTP 400 and a field-level complaint; `categoryId`/`locationId` are validated as `number` and a string id is refused the same way. `keywords`, `categoryId`, `locationId`, `minPrice` and `maxPrice` are all confirmed genuinely server-side.
 >
@@ -636,6 +636,8 @@ So there are **three decoders**: cheerio over HTML, devalue island props, devalu
 >
 > So the identity is the reading: **a shop page that names no `sellerId` is not a shop**, and nothing else on it is parsed. The result is `status: "gone"` — a normal result, not an error (§6.3). The final URL after redirects is asserted the same way §5.3 asserts a listing's, on the **origin and the path** together, and a response that cannot say where it ended up is a failure rather than a `gone`.
 >
+> Two readings ride with that, both of them about not letting a guard go quiet. `initialAds: null` is **also** what a real shop with nothing online carries, so it is read as an empty inventory — but only past the identity guard and only where the shop's own `adsOnline` is `0`; a null block on a shop stating listings is the encoding having moved, and an empty list would hide it (§5.4). And a page that *does* name a seller while saying `sellerType: "private"` is a **loud failure**, never a second `gone`: were the site to respell that string, a `gone` there would report every shop on the site as missing, silently.
+>
 > **The RPC's answer to the same slug is HTTP 204 with a zero-byte body**, which §4.5 already rules is an error and never zero results — reported as an empty page it would say a shop is empty that nobody looked at. The rule now lives in the request path, once, so every surface inherits it. It also means an unknown slug is `gone` on page 1 and an `http_error` on a deeper page: the RPC's 204 cannot distinguish "no such brand" from a request it declined to serve, and guessing between them is not this server's to do.
 
 ### 5.3 The deleted-ad guard
@@ -729,11 +731,13 @@ Operational failures use MCP `isError`. Domain outcomes are normal results with 
 | retries exhausted | `{ status: "gone" }` from `get_listing` |
 | `Retry-After` past the 60 s cap | `{ matches: [], count: 0 }` from any resolver |
 | parse failure with **no** stale entry | `{ stale: true, stale_reason: … }` wherever §6.2 applies |
-| HTTP 204 from `find_shop` | |
-| the §5.7 degenerate signature | |
+| **HTTP 204, from any surface** | `{ status: "gone" }` from `get_shop` |
+| the §5.7 degenerate signature | `{ listings: [] }` from `get_shop` past the end of a shop |
 | an invalid `KLEINANZEIGEN_MCP_RATE_LIMIT_MS` (process refuses to start) | |
 
 **"This listing no longer exists" and "nothing matched" are answers.** Dressing either as an error invites the agent to retry it. §5.4's rule — a block is never an empty list — is what makes the empty list safe to use as a real answer here.
+
+> **Correction, recorded while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)).** The 204 row read `HTTP 204 from find_shop`; it is now **any surface**, because the rule is enforced once in the request path rather than per tool. The shop inventory RPC returns a 204 of its own — for a `brandName` that does not exist — and a rule spelled per tool would have had to be written a second time to catch it. The two new normal results beside it are `get_shop`'s, and both are cases where the server *did* answer: a slug that names no shop (§5.2), and a page past the end of a shop's inventory.
 
 ### 6.4 Logging
 

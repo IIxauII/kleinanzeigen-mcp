@@ -67,6 +67,41 @@ export type GetShopResult = z.infer<typeof OutputSchema>;
  * read (SPEC 2.1, 4.3, 9.7). Declining the capability here would not give
  * private sellers parity; it would only make the gap harder to see.
  */
+/**
+ * Page 1, unfiltered: the shop page, whose island carries the profile **and**
+ * the listings in one blob.
+ */
+async function fromShopPage(shop_slug: string, page: number): Promise<GetShopResult> {
+  const { data, envelope } = await getFetchCore().fetch(
+    shopPageUrl(shop_slug),
+    // The response's own URL, not the one that was asked for: an unknown slug
+    // is a 200 with a shop-shaped page, so where the redirects came to rest is
+    // half the guard.
+    (body, response) => parseShopPage(body, { finalUrl: response.url }),
+  );
+  return data.status === "gone"
+    ? { ...envelope, status: "gone", shop: null, listings: [], page, count: 0 }
+    : {
+        ...envelope,
+        status: "ok",
+        shop: data.shop,
+        listings: data.listings,
+        page,
+        count: data.listings.length,
+      };
+}
+
+/**
+ * Everything else: the inventory RPC, which carries listings and no profile.
+ * An empty page past the end of the inventory is the walk ending, not a
+ * failure and not a missing page (SPEC 5.2).
+ */
+async function fromInventoryRpc(args: GetShopArgs, page: number): Promise<GetShopResult> {
+  const request = shopAdsRequest({ ...args, page });
+  const { data, envelope } = await getFetchCore().fetch(request.url, (body) => parseShopAds(body), request.body);
+  return { ...envelope, status: "ok", shop: null, listings: data.listings, page, count: data.listings.length };
+}
+
 export function registerGetShop(server: McpServer): void {
   server.registerTool(
     "get_shop",
@@ -79,46 +114,14 @@ export function registerGetShop(server: McpServer): void {
       const page = args.page ?? 1;
       const fromIsland = page === 1 && !isFiltered(args);
       try {
-        const result = await (async (): Promise<GetShopResult> => {
-          if (fromIsland) {
-            const { data, envelope } = await getFetchCore().fetch(
-              shopPageUrl(args.shop_slug),
-              // The response's own URL, not the one that was asked for: an
-              // unknown slug is a 200 with a shop-shaped page, so where the
-              // redirects came to rest is half the guard.
-              (body, response) => parseShopPage(body, { finalUrl: response.url }),
-            );
-            if (data.status === "gone") {
-              return { ...envelope, status: "gone", shop: null, listings: [], page, count: 0 };
-            }
-            return {
-              ...envelope,
-              status: "ok",
-              shop: data.shop,
-              listings: data.listings,
-              page,
-              count: data.listings.length,
-            };
-          }
-          const request = shopAdsRequest({ ...args, page });
-          const { data, envelope } = await getFetchCore().fetch(
-            request.url,
-            (body) => parseShopAds(body),
-            request.body,
-          );
-          // An empty page past the end of the inventory is the walk ending,
-          // not a failure and not a missing page (SPEC 5.2).
-          return {
-            ...envelope,
-            status: "ok",
-            shop: null,
-            listings: data.listings,
-            page,
-            count: data.listings.length,
-          };
-        })();
+        const result = fromIsland
+          ? await fromShopPage(args.shop_slug, page)
+          : await fromInventoryRpc(args, page);
+        // **No slug.** §6.4 keeps seller names out of the log, and a shop slug
+        // is a seller's name in handle form — `search_listings` logs neither
+        // its keyword nor its location for the same reason. The `fetch` line's
+        // URL is the permitted metadata that already says which shop.
         log("get_shop", {
-          shop_slug: args.shop_slug,
           page,
           source: fromIsland ? "island" : "rpc",
           status: result.status,

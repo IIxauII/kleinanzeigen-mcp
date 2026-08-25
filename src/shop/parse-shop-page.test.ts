@@ -128,6 +128,42 @@ describe("page 1 of a shop, read off the shop page's islands", () => {
     expect(parse("shop-page", `https://kleinanzeigen.de/pro/${SLUG}`).status).toBe("ok");
   });
 
+  it("reads a shop with nothing online as an empty inventory, and only where it says so", () => {
+    // `initialAds: null` is what a shop with no live listings carries — the
+    // same shape the missing shop's page has, which is why it is only read
+    // this way past the identity guard.
+    const island = (props: Record<string, unknown>): string =>
+      `<astro-island opts='{"name":"BrandProfilePage","value":true}' props='${JSON.stringify(props)}'></astro-island>` +
+      `<astro-island opts='{"name":"UserBadges","value":true}' props='{"companyName":[0,"Ein Musterhaus"]}'></astro-island>`;
+    const props = (adsOnline: number) => ({
+      brandName: [0, SLUG],
+      sellerId: [0, 21000000],
+      sellerType: [0, "commercial"],
+      adsOnline: [0, adsOnline],
+      initialAds: [0, null],
+    });
+    const empty = parseShopPage(island(props(0)), { finalUrl: shopPageUrl(SLUG) });
+    expect(empty).toMatchObject({ status: "ok", listings: [] });
+    // A shop stating listings and carrying no block for them is the encoding
+    // having moved, and an empty list would hide it (SPEC 5.4, 5.8).
+    expect(() => parseShopPage(island(props(30)), { finalUrl: shopPageUrl(SLUG) })).toThrow(ParseError);
+  });
+
+  it("shouts rather than answering gone where a named seller is not commercial", () => {
+    // Not a second `gone`: the site respelling this string would then report
+    // every shop as missing, silently (SPEC 5.8).
+    const page = fixture("shop-page").replace("&quot;commercial&quot;", "&quot;COMMERCIAL&quot;");
+    expect(() => parseShopPage(page, { finalUrl: shopPageUrl(SLUG) })).toThrow(ParseError);
+  });
+
+  it("shouts rather than reporting no store id where storeId changed shape", () => {
+    // A shop without one is a real shape and reads null; a `storeId` arriving
+    // as a number is the encoding having moved (SPEC 5.8).
+    const page = fixture("shop-page").replace("&quot;storeId&quot;:[0,&quot;60000&quot;]", "&quot;storeId&quot;:[0,60000]");
+    expect(page).not.toBe(fixture("shop-page"));
+    expect(() => parseShopPage(page, { finalUrl: shopPageUrl(SLUG) })).toThrow(ParseError);
+  });
+
   it("shouts rather than guessing where the page carries no island at all", () => {
     expect(() => parseShopPage("<html><body></body></html>", { finalUrl: shopPageUrl(SLUG) })).toThrow(ParseError);
   });
