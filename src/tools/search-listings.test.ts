@@ -297,7 +297,14 @@ describe("what the result deliberately does not carry", () => {
     const client = await connect(serving(fixture("search-page-1")));
     const result = await search(client, { keywords: "fahrrad", location: "Flensburg" });
     expect(result).not.toHaveProperty("scope");
+    // The fixture's summary reads `… für „fahrrad" in Berlin und Umgebung`, so
+    // the absence below is the label's, not an empty result's — and the guard
+    // #6 asked for arrives as the resolution instead.
     expect(JSON.stringify(result)).not.toContain("und Umgebung");
+    expect(result.location_resolution).toMatchObject({
+      input: "Flensburg",
+      resolved_to: { id: 714 },
+    });
   });
 
   it("does not dedupe, because drift is the caller's and dedupe would need state", async () => {

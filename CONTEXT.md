@@ -210,6 +210,10 @@ How results are ordered. Newest first is the default.
 **Page** _(Seite)_:
 One page of a search results page's pagination: 25 organic listings.
 
+**Drift**:
+The result set sliding underneath a caller-driven walk. New listings land, the date window moves, and the same listing is served on two pages while another is never served at all — 5 of 125 organic rows were duplicates over a 13-second sweep. It is a property of the source rather than of the walk, so **dedupe is the caller's**: dedupe on ad id and report the *distinct* count, never pages × 25. A server-side dedupe would need the query-scoped state [ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md) forbids.
+_Avoid_: Churn, jitter, pagination bug
+
 **Shipping offered** _(Versand möglich)_:
 The seller will ship the item.
 
