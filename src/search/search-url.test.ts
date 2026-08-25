@@ -41,44 +41,10 @@ describe("the search URL grammar", () => {
     expect(path(searchUrl({ page: 3, category_id: 217 }))).not.toContain("k0");
   });
 
-  it("maps every argument to the site's own wire parameter name", () => {
-    const parameters = query(
-      searchUrl({
-        keywords: "hollandrad",
-        location: "10115",
-        radius: 20,
-        min_price: 50,
-        max_price: 500,
-        ad_type: "WANTED",
-        poster_type: "COMMERCIAL",
-        sort: "PRICE_AMOUNT_DESC",
-      }),
-    );
-    expect(Object.fromEntries(parameters)).toEqual({
-      keywords: "hollandrad",
-      locationStr: "10115",
-      radius: "20",
-      minPrice: "50",
-      maxPrice: "500",
-      adType: "WANTED",
-      posterType: "COMMERCIAL",
-      sortingField: "PRICE_AMOUNT_DESC",
-    });
-  });
-
   it("serialises both shipping literals, because false is a real filter", () => {
     expect(query(searchUrl({ shipping: true })).get("shipping")).toBe("true");
     expect(query(searchUrl({ shipping: false })).get("shipping")).toBe("false");
     expect(query(searchUrl({})).has("shipping")).toBe(false);
-  });
-
-  it("keeps shipping: false beside a carrier, which is an honest empty set", () => {
-    // "Ships by DHL" ∩ "pickup only" is empty by construction, and the caller
-    // is entitled to ask for it. Dropping the literal would answer a different
-    // question (SPEC 5.6).
-    const parameters = query(searchUrl({ shipping: false, shipping_carrier: "DHL" }));
-    expect(parameters.get("shipping")).toBe("false");
-    expect(parameters.get("shippingCarrier")).toBe("DHL");
   });
 
   it("never sends buy_now: false, which is a no-op the site answers with the baseline", () => {
@@ -112,12 +78,18 @@ describe("the two refinements", () => {
   it("refuses nothing the site would answer honestly", () => {
     // `zod` rejects only what the site would 400 or could not be asked; an
     // honest empty set is a value (SPEC 11.4).
-    expect(
-      SearchQuerySchema.safeParse({ poster_type: "COMMERCIAL", shipping_carrier: "DHL" }).success,
-    ).toBe(true);
-    expect(SearchQuerySchema.safeParse({ shipping: false, shipping_carrier: "DHL" }).success).toBe(
-      true,
-    );
+    const answerable = [
+      { poster_type: "COMMERCIAL", shipping_carrier: "DHL" },
+      { poster_type: "COMMERCIAL", buy_now: true },
+      { shipping: false, shipping_carrier: "HERMES" },
+      { buy_now: false },
+      { min_price: 900, max_price: 10 },
+      { location_id: 3331, radius: 0 },
+      { page: 51 },
+    ];
+    for (const answerableQuery of answerable) {
+      expect(SearchQuerySchema.safeParse(answerableQuery)).toMatchObject({ success: true });
+    }
   });
 });
 
@@ -146,20 +118,24 @@ describe("the filters the site answers server-side", () => {
   });
 
   it("keeps a known-honest empty set's parameters exactly as they were asked for", () => {
-    // Commercial sellers ship — just not through the mechanism these two filters
-    // key on — so both combinations return nothing, and neither is "fixed" by
-    // dropping a parameter, which would answer a different question (SPEC 5.6).
+    // Both of §5.6's families. Commercial sellers ship — just not through the
+    // mechanism the first two filters key on — and "ships by DHL" ∩ "pickup
+    // only" is empty by construction. All three return nothing, and none is
+    // "fixed" by dropping a parameter, which would answer a different question.
     expect(
       Object.fromEntries(query(searchUrl({ poster_type: "COMMERCIAL", shipping_carrier: "DHL" }))),
     ).toEqual({ posterType: "COMMERCIAL", shippingCarrier: "DHL" });
     expect(Object.fromEntries(query(searchUrl({ poster_type: "COMMERCIAL", buy_now: true })))).toEqual(
       { posterType: "COMMERCIAL", buyNowEnabled: "true" },
     );
+    expect(Object.fromEntries(query(searchUrl({ shipping: false, shipping_carrier: "HERMES" })))) //
+      .toEqual({ shipping: "false", shippingCarrier: "HERMES" });
   });
 
-  it("carries the whole surface on one URL, with the path driven by two ids only", () => {
+  it("maps every argument to the site's own wire parameter name", () => {
     // Every narrowing input but the two path codes is a query parameter on an
-    // allowed pretty URL (SPEC 2.2, 11.2).
+    // allowed pretty URL, and this is the one place the mapping from the
+    // `snake_case` argument lives (SPEC 2.2, 11.2, 11.5).
     const url = searchUrl({
       keywords: "hollandrad",
       category_id: 217,
@@ -188,6 +164,9 @@ describe("the filters the site answers server-side", () => {
       buyNowEnabled: "true",
       sortingField: "PRICE_AMOUNT",
     });
+    // Free-text location is the one argument the surface above cannot also
+    // carry: it is mutually exclusive with `location_id`.
+    expect(query(searchUrl({ location: "Flensburg" })).get("locationStr")).toBe("Flensburg");
   });
 });
 
@@ -217,25 +196,5 @@ describe("the filters that do not exist", () => {
       attributes: { "global.zustand": "new" },
     });
     expect(parsed.success).toBe(false);
-  });
-});
-
-describe("what zod does not reject", () => {
-  it("passes on every combination the site would answer honestly", () => {
-    // The rule is that `zod` rejects only what the site would 400 or could not
-    // be asked at all; an honest empty set is a value (SPEC 11.4).
-    const answerable = [
-      { poster_type: "COMMERCIAL", shipping_carrier: "DHL" },
-      { poster_type: "COMMERCIAL", buy_now: true },
-      { shipping: false, shipping_carrier: "HERMES" },
-      { buy_now: false },
-      { min_price: 900, max_price: 10 },
-      { min_price: 0, max_price: 0 },
-      { location_id: 3331, radius: 0 },
-      { page: 51 },
-    ];
-    for (const query of answerable) {
-      expect(SearchQuerySchema.safeParse(query)).toMatchObject({ success: true });
-    }
   });
 });
