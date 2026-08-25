@@ -224,6 +224,13 @@ type SearchRow = {
 };
 ```
 
+> **Correction, recorded while building `search_listings` ([#19](https://github.com/IIxauII/kleinanzeigen-mcp/issues/19)).** Two of `SearchRow`'s fields above are not always present on the live page, and both are now **nullable**.
+>
+> - **`posted` is `null` on a TOP row.** A promoted row renders an empty `.aditem-main--top--right` — no date, no calendar icon — on every page sampled, while every organic row on those same pages carries one. Since TOP listings are returned flagged and in place (§4.1), the date has to be allowed to be missing on exactly the rows that are marked as the reason it is.
+> - **`description` falls back to the visible snippet** on a picture-less row. The ~200-character text lives in the row's `ld+json`, and that block describes the row's *image*: a row rendering `imagebox is-nopic` has no `ld+json` at all (17 of 108 sampled rows). The visible `p.aditem-main--middle--description` is shorter, and reading it is honest; treating the absence as a parse failure would make a normal row look like a DOM change.
+>
+> `thumbnail: null` and `image_count: 0` on those same rows were already in the type. A row that renders an image but no `.galleryimage--counter` has exactly one image.
+
 ```ts
 type Listing = {
   ad_id: string;
@@ -405,6 +412,12 @@ type LocationResolution = {
 ```
 
 Present only when `location` (free text) was used. The failure mode is silent picking; the fix is a value, not a warning.
+
+> **Correction, recorded while building `search_listings` ([#19](https://github.com/IIxauII/kleinanzeigen-mcp/issues/19)).** The worked example above is a **postcode**, and a postcode is the one input this field cannot speak to: §7's correction established that the postcode layer's ids are absent from every allowed source, so `10115` matches **nothing** in the bundled dataset and arrives as `resolved_to: null, ambiguous: false, alternatives: []`.
+>
+> The mechanism is intact for the case it can actually see — a colliding **name**, of which the dataset holds many (four Neustadts, two Mittes) — and those do return `ambiguous: true` with every candidate named. What is lost is only the postcode example, not the field.
+>
+> **`resolved_to` is `null` whenever the dataset holds more than one candidate.** Naming one of them would be the same silent pick this field exists to expose, so the alternatives carry the whole answer and nothing is promoted to a resolution.
 
 **Description**
 
