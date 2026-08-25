@@ -18,16 +18,13 @@
  * `--refetch` to go back to the network.
  */
 import * as cheerio from "cheerio";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ORIGIN } from "../src/search/search-url.ts";
-import { USER_AGENT } from "../src/user-agent.ts";
+import { raw } from "./capture-raw.ts";
+import { redactor } from "./redact.ts";
 
-const RAW_DIR = fileURLToPath(new URL("../.fixture-capture/", import.meta.url));
 const OUT_DIR = fileURLToPath(new URL("../tests/fixtures/", import.meta.url));
-
-/** Personal-scale politeness: serialised, no bursting (SPEC 2.8). */
-const REQUEST_GAP_MS = 1500;
 
 /**
  * Every shape the parser has to survive, and the one reason each is here.
@@ -50,66 +47,6 @@ const PAGES = [
   // the block that presents the same way (SPEC 5.6, 6.3).
   { name: "search-empty", url: `${ORIGIN}/s-k0?keywords=qzxwvnoresultsforthisquery` },
 ] as const;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function raw(name: string, url: string, refetch: boolean): Promise<string> {
-  const path = `${RAW_DIR}${name}.html`;
-  if (!refetch && existsSync(path)) return readFileSync(path, "utf8");
-  process.stderr.write(`GET ${url}\n`);
-  const response = await fetch(url, { headers: { "user-agent": USER_AGENT } });
-  if (!response.ok) throw new Error(`${url} answered HTTP ${response.status}`);
-  const body = await response.text();
-  mkdirSync(RAW_DIR, { recursive: true });
-  writeFileSync(path, body);
-  await sleep(REQUEST_GAP_MS);
-  return body;
-}
-
-
-/**
- * Synthetic stand-ins. The pool keeps the shapes the parser has to survive —
- * a plain name, one with an umlaut, one with an eszett, multi-word names and a
- * lower-case particle — so redaction costs the fixture no coverage.
- */
-const PLACES = [
-  "Musterstadt",
-  "Königsbrück",
-  "Neustadt an der Nordsee",
-  "Bad Grönenbach",
-  "St Sebald",
-  "Weißenthal",
-  "Altdorf bei Musterberg",
-  "Kleinlinden",
-] as const;
-
-const LOREM =
-  "Synthetischer Beschreibungstext für eine Testvorrichtung. Er steht an der Stelle " +
-  "des echten Anzeigentexts und trägt keine personenbezogenen Daten. Er ist lang genug, " +
-  "um die Länge zu treffen, die das ld+json der Zeile sonst führt.";
-
-/** Stable per page, so the same real place keeps one stand-in inside one fixture. */
-function redactor() {
-  const places = new Map<string, string>();
-  return {
-    place(real: string): string {
-      const known = places.get(real);
-      if (known !== undefined) return known;
-      const standIn = PLACES[places.size % PLACES.length]!;
-      places.set(real, standIn);
-      return standIn;
-    },
-    postcode: (index: number): string => String(10000 + ((index * 137) % 89999)),
-    adId: (index: number): string => String(3400000000 + index),
-    slug: (index: number): string => `synthetisches-inserat-${index}`,
-    title: (index: number): string => `Synthetisches Inserat ${index}`,
-    image: (index: number): string =>
-      `https://img.kleinanzeigen.de/api/v1/prod-ads/images/00/00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-    /** The ld+json description is ~200 characters and ends truncated; the visible one is shorter. */
-    long: (index: number): string => `${LOREM.slice(0, 197)}... [${index}]`,
-    short: (): string => `${LOREM.slice(0, 92)}...`,
-  };
-}
 
 /**
  * Everything outside the two anchors §5.1 names is dropped, and every value a

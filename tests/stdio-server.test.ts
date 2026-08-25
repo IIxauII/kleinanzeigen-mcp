@@ -22,7 +22,7 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
     const client = await spawn();
     try {
       expect((await client.listTools()).tools.map((tool) => tool.name)) //
-        .toEqual(["search_listings", "find_category", "find_location"]);
+        .toEqual(["search_listings", "get_listing", "find_category", "find_location"]);
     } finally {
       await client.close();
     }
