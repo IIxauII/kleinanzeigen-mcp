@@ -1,0 +1,33 @@
+{
+  "name": "kleinanzeigen-mcp",
+  "version": "0.1.0",
+  "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  "type": "module",
+  "bin": {
+    "kleinanzeigen-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "generate:category-tree": "node scripts/generate-category-tree.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "cheerio": "^1.2.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.2",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}
