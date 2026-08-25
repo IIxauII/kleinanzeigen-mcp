@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { spawn as spawnProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -33,8 +34,10 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
         name: "find_category",
         arguments: { query: "Bahn & ÖPNV" },
       });
-      expect(result.structuredContent).toEqual({
+      expect(result.structuredContent).toMatchObject({
         count: 1,
+        stale: false,
+        source_url: null,
         matches: [
           {
             category_id: 286,
@@ -49,5 +52,34 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
     } finally {
       await client.close();
     }
+  });
+
+  it("refuses to start on an invalid rate limit, before the transport opens", async () => {
+    const child = spawnProcess(process.execPath, [BUNDLE], {
+      env: { ...process.env, KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "soon" },
+    });
+    let stderr = "";
+    let stdout = "";
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));
+
+    expect(code).not.toBe(0);
+    expect(stderr).toContain("KLEINANZEIGEN_MCP_RATE_LIMIT_MS");
+    expect(stderr).toContain("soon");
+    // No silent fallback, and nothing on stdout: the transport never opened.
+    expect(stderr).not.toContain("server_started");
+    expect(stdout).toBe("");
+  });
+
+  it("starts on a valid rate limit", async () => {
+    const child = spawnProcess(process.execPath, [BUNDLE], {
+      env: { ...process.env, KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "5000" },
+    });
+    const started = await new Promise<string>((resolve) => {
+      child.stderr.on("data", (chunk: Buffer) => resolve(chunk.toString()));
+    });
+    child.kill();
+    expect(JSON.parse(started)).toMatchObject({ event: "server_started", rate_limit_ms: 5000 });
   });
 });
