@@ -1,0 +1,53 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const BUNDLE = fileURLToPath(new URL("../dist/index.js", import.meta.url));
+
+/**
+ * The acceptance shape of SPEC 8.3: an MCP client spawns the built bundle over
+ * stdio, lists its tools and calls one. Skipped until `npm run build` has run.
+ */
+describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
+  async function spawn(): Promise<Client> {
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [BUNDLE] }));
+    return client;
+  }
+
+  it("lists find_category", async () => {
+    const client = await spawn();
+    try {
+      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(["find_category"]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("resolves a category against the sidecar dataset", async () => {
+    const client = await spawn();
+    try {
+      const result = await client.callTool({
+        name: "find_category",
+        arguments: { query: "Bahn & ÖPNV" },
+      });
+      expect(result.structuredContent).toEqual({
+        count: 1,
+        matches: [
+          {
+            category_id: 286,
+            name: "Bahn & ÖPNV",
+            slug: "bahn-oepnv",
+            path: "/s-bahn-oepnv/c286",
+            parent_id: 231,
+            parent_name: "Eintrittskarten & Tickets",
+          },
+        ],
+      });
+    } finally {
+      await client.close();
+    }
+  });
+});
