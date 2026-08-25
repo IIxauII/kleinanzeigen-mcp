@@ -369,6 +369,8 @@ That last line is the through-line of the whole surface. Agents read values, not
 
 Both are cases where the site cannot be *asked* a coherent question, not cases where it would answer honestly with an empty set — see §11.4 for why that line is drawn here and nowhere else.
 
+> **Recorded while building the filter surface ([#20](https://github.com/IIxauII/kleinanzeigen-mcp/issues/20)).** The argument object is **strict**: an unrecognised key is refused, never stripped. That is not a third rejection rule. §11.4 governs combinations of arguments this surface *has*; strictness governs an argument it does **not** have, and §2.6 already says the missing filters are "not accepted-and-ignored". Stripping `attributes` silently is exactly accepted-and-ignored — the caller asks for a filtered set, gets the nationwide one, and is told nothing. The rule is the surface's, not this tool's: §4.4's resolvers refuse an unrecognised argument too, so a caller that invents `limit` reads no full list as a truncated one.
+
 **Serialisation rules that are not obvious**
 
 - **`shipping` is a genuine tri-state.** `true` → ships (`versand:ja`), `false` → **pickup only** (`versand:nein`, a real filter: `16.292 → 3.507`, 0/27 rows tagged, and `12.785 + 3.507 = 16.292` partitions the base exactly), omitted → both. **Both literals are serialised.**

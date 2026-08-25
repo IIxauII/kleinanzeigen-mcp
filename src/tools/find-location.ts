@@ -10,7 +10,10 @@ import { toolResult } from "./tool-result.ts";
 export const FIND_LOCATION_DESCRIPTION =
   "Location ids matching a name or postcode. Always returns candidates — a\npostcode can map to several locations.";
 
-const inputSchema = {
+// **Strict**, as on `search_listings`: an argument this resolver does not have
+// is refused rather than stripped, so a caller that invents `limit` or `parent`
+// is told, instead of reading an unfiltered list as a filtered one (SPEC 2.6).
+const inputSchema = z.strictObject({
   query: z
     .string()
     .describe(
@@ -20,7 +23,7 @@ const inputSchema = {
         "search_listings' free-text `location` instead, which the site resolves " +
         "itself — silently picking when the postcode spans several locations.",
     ),
-};
+});
 
 const outputSchema = {
   ...ENVELOPE_OUTPUT_SHAPE,

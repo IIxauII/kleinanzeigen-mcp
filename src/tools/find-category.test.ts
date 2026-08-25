@@ -101,4 +101,15 @@ describe("find_category over MCP", () => {
     const result = await client.callTool({ name: "find_category", arguments: {} });
     expect(result.isError).toBe(true);
   });
+
+  it("refuses an argument it does not have, rather than ignoring it", async () => {
+    // The same rule the filter surface follows: a caller that invents `limit`
+    // is told, instead of reading a full list as a truncated one (SPEC 2.6).
+    const client = await connect(tree);
+    const result = await client.callTool({
+      name: "find_category",
+      arguments: { query: "Autos", limit: 5 },
+    });
+    expect(result.isError).toBe(true);
+  });
 });

@@ -18,7 +18,12 @@ export type Sort = (typeof SORTS)[number];
  * (SPEC 11.5).
  */
 export const SearchQuerySchema = z
-  .object({
+  // **Strict**, because an argument that does not exist must not look answered.
+  // Sort-by-distance, category attribute filters and multi-carrier search have
+  // no server-side form, so they are absent from this surface — and absent has
+  // to mean refused rather than accepted-and-ignored, or an agent that guesses
+  // `attributes` reads a nationwide result as a filtered one (SPEC 2.6).
+  .strictObject({
     keywords: z.string().optional(),
     category_id: z.number().int().positive().optional(),
     location_id: z.number().int().positive().optional(),

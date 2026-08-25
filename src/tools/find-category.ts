@@ -10,9 +10,12 @@ import { toolResult } from "./tool-result.ts";
 export const FIND_CATEGORY_DESCRIPTION =
   "Category ids matching a name. Always returns candidates — names and slugs\ncollide, so only the numeric id identifies a category.";
 
-const inputSchema = {
+// **Strict**, as on `search_listings`: an argument this resolver does not have
+// is refused rather than stripped, so a caller that invents `limit` or `depth`
+// is told, instead of reading an unfiltered list as a filtered one (SPEC 2.6).
+const inputSchema = z.strictObject({
   query: z.string().describe("A German category name, optionally qualified as \"Parent > Child\"."),
-};
+});
 
 const outputSchema = {
   ...ENVELOPE_OUTPUT_SHAPE,
