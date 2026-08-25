@@ -1,11 +1,8 @@
 import { z } from "zod";
-import { ORIGIN } from "../search/search-url.ts";
+import { ORIGIN, SITE_HOSTS } from "../search/search-url.ts";
 
 /** The one path a listing is served at. Kleinanzeigen's own code calls it the VIP; we do not. */
 const LISTING_PATH = "/s-anzeige/";
-
-/** Both spellings of the site's own host. A redirect may come to rest on either. */
-const HOSTS = new Set([new URL(ORIGIN).host, "kleinanzeigen.de"]);
 
 /**
  * `get_listing`'s argument: **the ad id only** (SPEC 4.2).
@@ -65,6 +62,6 @@ export function readFinalUrl(url: string): FinalUrl {
   } catch {
     return "unreadable";
   }
-  if (!HOSTS.has(host)) return "unreadable";
+  if (!SITE_HOSTS.has(host)) return "unreadable";
   return path.startsWith(LISTING_PATH) ? "listing" : "not-a-listing";
 }

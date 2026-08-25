@@ -4,6 +4,14 @@ import { LISTING_TYPES } from "./search-row.ts";
 
 export const ORIGIN = "https://www.kleinanzeigen.de";
 
+/**
+ * Both spellings of the site's own host. A redirect may come to rest on
+ * either, and a guard that knows only one would call the apex host's own page
+ * an impostor — while a guard that checks the path alone would accept
+ * `https://kleinanzeigen.de.example.com/…` (SPEC 5.3).
+ */
+export const SITE_HOSTS: ReadonlySet<string> = new Set([new URL(ORIGIN).host, "kleinanzeigen.de"]);
+
 // `ad_type` and `poster_type` are the site's own argument spellings (SPEC 4.1),
 // and their values are the listing types and seller types `CONTEXT.md` already
 // names — so each enum is that one, not a second copy under a name the
