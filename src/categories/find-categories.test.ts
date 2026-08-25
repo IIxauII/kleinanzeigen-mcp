@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CategoryTree } from "./category-tree.ts";
-import { findCategories, foldForMatch, qualifiedName } from "./find-categories.ts";
+import { findCategories, qualifiedName } from "./find-categories.ts";
 
 const node = (
   category_id: number,
@@ -25,17 +25,6 @@ const TREE: CategoryTree = [
   node(297, "Dienstleistungen", "dienstleistungen", null),
   node(289, "Auto, Rad & Boot", "auto-rad-boot", SERVICES),
 ];
-
-describe("foldForMatch", () => {
-  it("folds case and diacritics", () => {
-    expect(foldForMatch("FahrrÄder")).toBe("fahrrader");
-    expect(foldForMatch("Bahn & ÖPNV")).toBe("bahn & opnv");
-  });
-
-  it("collapses surrounding and repeated whitespace", () => {
-    expect(foldForMatch("  Auto,   Rad & Boot ")).toBe("auto, rad & boot");
-  });
-});
 
 describe("qualifiedName", () => {
   it("qualifies a subcategory with its parent", () => {

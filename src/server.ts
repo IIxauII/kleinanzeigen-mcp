@@ -1,20 +1,32 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadCategoryTree, type CategoryTree } from "./categories/category-tree.ts";
+import { loadCityDataset, type CityDataset } from "./locations/city-dataset.ts";
 import { registerFindCategory } from "./tools/find-category.ts";
+import { registerFindLocation } from "./tools/find-location.ts";
 import { VERSION } from "./version.ts";
 
 /**
  * Builds the server and registers the tool surface. Nothing is read from disk
- * and no request is made here — the bundled tree loads on first use (SPEC 7).
+ * and no request is made here — each bundled dataset loads on first use
+ * (SPEC 7).
  *
- * `readCategoryTree` is overridable so tests can supply a tree without a built
- * sidecar file.
+ * Each reader is overridable so a test can supply one dataset without a built
+ * sidecar file — and without passing a positional `undefined` for the other.
  */
-export function createServer(readCategoryTree: () => CategoryTree = loadCategoryTree): McpServer {
+export type DatasetReaders = {
+  readCategoryTree?: () => CategoryTree;
+  readCityDataset?: () => CityDataset;
+};
+
+export function createServer({
+  readCategoryTree = loadCategoryTree,
+  readCityDataset = loadCityDataset,
+}: DatasetReaders = {}): McpServer {
   const server = new McpServer(
     { name: "kleinanzeigen-mcp", version: VERSION },
     { capabilities: { tools: {} } },
   );
   registerFindCategory(server, readCategoryTree);
+  registerFindLocation(server, readCityDataset);
   return server;
 }
