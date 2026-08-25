@@ -41,3 +41,15 @@ Nothing is lost by stopping at tier two, because **a location id implies its who
 §7 budgets "~84 KB gzipped", a figure measured on a payload of **slugs and ids only**. The five fields `find_location` returns cost roughly twice that. The dataset ships as one tuple per line — `[id, name, slug, state_index]`, with the 16 states in their own table — which lands it at **139 KB gzipped, 444 KB raw**, against 156 KB for the same data as objects.
 
 An encoding that dropped the 10 495 slugs a name can reproduce would reach ~100 KB, and was rejected: it buys 39 KB in exchange for a slug-derivation rule duplicated in the generator and the loader that must never drift apart, for a field that is cosmetic anyway. The line per row is kept deliberately — it is what makes the drift check a readable diff (§8.2).
+
+## The matching fold expands umlauts, one way
+
+The two resolvers share one fold, and it produces **two forms** for every string: the plain diacritic strip (`Köln` → `koln`) and the German expansion (`Köln` → `koeln`). Two strings match when their form sets intersect, so `Köln`, `Koln` and `koeln` all reach `Köln` and nothing else does.
+
+This is required by the same finding that gave us the second source. The catalogue names locations in real German — `Köln`, `Kr. München`, `Mülheim (Ruhr)` — while the site spells its own slugs `koeln`, `muenchen`, and a German caller on an ASCII keyboard writes it the second way. A fold that only stripped marks would answer `koeln` with nothing.
+
+**It is transliteration, and §4.5's "never transliterate" does not reach it.** That rule governs the caller's string on its way to a **live `fulltext` query**, where the site's umlaut handling is uncharacterised (`köln` → 492 hits, `koln` → 3). Here both sides of a purely local comparison are folded identically, and the result is exact — not fuzzy, not edit-distance, not substring.
+
+**The expansion runs one way only.** `ü` becomes `ue`; `ue` never becomes `ü`. Contraction would have to guess that a `ue` stands for an umlaut, which is wrong far more often than right — Neuss, Neuenkirchen, Duisburg — and a resolver that guesses is the thing this surface exists to prevent. The visible consequence is pinned by a test: the site carries **Füssen `l9915` and Fuessen `l9747`** as two distinct Bayern locations sharing one slug, so `Füssen` and `Fuessen` each return **both** ids and let the caller choose, while `Fussen` reaches only `l9915`.
+
+`find_category` widens the same way, because two different matching rules under one shared spec sentence would be worse than one rule applied twice. It only ever widens: no category that matched before stops matching.

@@ -475,6 +475,10 @@ Matching is **case- and diacritic-insensitive** against the name and against a q
 
 Zero matches is `{ matches: [], count: 0 }` — an answer.
 
+> **Correction ([#18](https://github.com/IIxauII/kleinanzeigen-mcp/issues/18)).** `find_location`'s description above promises more than the dataset can keep: **a postcode matches nothing**, because the postcode layer's ids are absent from every allowed source (§7's correction). It is left verbatim because a shipped description is a contract, and the shortfall is recorded here, in the tool's input schema, and in [ADR-0004](./docs/adr/0004-the-city-dataset-has-two-sources.md) rather than silently reworded. A postcode remains usable as §4.1's free-text `location`.
+>
+> Matching also folds **`ä ö ü ß` to `ae oe ue ss`** alongside the plain diacritic strip, so `Köln`, `Koln` and `koeln` all reach `Köln`. This is transliteration, and §4.5's "never transliterate" does not reach it: that rule governs the caller's string on its way to a **live `fulltext` query**, where the site's own umlaut handling is uncharacterised. Here both sides of a local comparison are folded identically, the fold is exact rather than approximate, and the site spells its own location slugs this way. The expansion runs **one way only** — nothing contracts `ue` back to `ü`.
+
 **Descriptions**
 
 ```
