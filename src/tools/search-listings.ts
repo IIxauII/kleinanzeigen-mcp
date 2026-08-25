@@ -7,9 +7,9 @@ import { findLocations, qualifiedLocationName } from "../locations/find-location
 import { log } from "../logging.ts";
 import { parseSearchPage } from "../search/parse-search-page.ts";
 import { SearchRowSchema } from "../search/search-row.ts";
+import { REACHABLE } from "../search/ceiling.ts";
 import {
   isDegenerateForm,
-  REACHABLE,
   searchUrl,
   SearchQuerySchema,
   SORTS,
@@ -38,7 +38,7 @@ const LocationResolutionSchema = z.object({
   alternatives: z.array(CandidateSchema),
 });
 
-const outputSchema = {
+const OutputSchema = z.object({
   ...ENVELOPE_OUTPUT_SHAPE,
   listings: z.array(SearchRowSchema),
   /** The site's stated count, read as a number off the results summary (SPEC 5.5). */
@@ -57,7 +57,10 @@ const outputSchema = {
   /** What was **sent**, never what was applied: the applied sort cannot be read back (SPEC 4.1). */
   sort: z.enum(SORTS).nullable(),
   location_resolution: LocationResolutionSchema.optional(),
-};
+});
+
+/** The result shape, so a test asserts against the schema rather than a copy of it. */
+export type SearchListingsResult = z.infer<typeof OutputSchema>;
 
 /**
  * A postcode resolves to nothing here — the postcode layer's ids are absent
@@ -96,14 +99,14 @@ export function registerSearchListings(server: McpServer, readCityDataset: () =>
     {
       description: SEARCH_LISTINGS_DESCRIPTION,
       inputSchema: SearchQuerySchema,
-      outputSchema,
+      outputSchema: OutputSchema.shape,
     },
     async (query: SearchQuery) => {
       const page = query.page ?? 1;
       const url = searchUrl(query);
       try {
         const { data, envelope } = await getFetchCore().fetch(url, (body) =>
-          parseSearchPage(body, { page, degenerate_form: isDegenerateForm(query) }),
+          parseSearchPage(body, { page, degenerateForm: isDegenerateForm(query) }),
         );
         const result = {
           ...envelope,

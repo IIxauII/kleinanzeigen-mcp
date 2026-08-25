@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isDegenerateForm, REACHABLE, searchUrl, SearchQuerySchema } from "./search-url.ts";
+import { REACHABLE } from "./ceiling.ts";
+import { isDegenerateForm, searchUrl, SearchQuerySchema } from "./search-url.ts";
 
 const query = (url: string) => new URL(url).searchParams;
 const path = (url: string) => new URL(url).pathname;

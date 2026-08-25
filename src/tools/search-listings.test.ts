@@ -5,36 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BLOCK_MARKER } from "../fetch/breaker.ts";
 import { configureFetchCore, resetFetchCore, type FetchImpl } from "../fetch/core.ts";
 import { loadCityDataset, resetCityDataset } from "../locations/city-dataset.ts";
-import type { SearchRow } from "../search/search-row.ts";
 import { createServer } from "../server.ts";
-import { SEARCH_LISTINGS_DESCRIPTION } from "./search-listings.ts";
+import { SEARCH_LISTINGS_DESCRIPTION, type SearchListingsResult } from "./search-listings.ts";
 
 const fixture = (name: string): string =>
   readFileSync(new URL(`../../tests/fixtures/${name}.html`, import.meta.url), "utf8");
 
 const dataset = () => loadCityDataset(new URL("../../data/cities.json", import.meta.url));
-
-type SearchResult = {
-  listings: SearchRow[];
-  total: number | null;
-  reachable: number;
-  range: { from: number; to: number } | null;
-  clamped: boolean;
-  organic_count: number;
-  promoted_count: number;
-  page: number;
-  sort: string | null;
-  location_resolution?: {
-    input: string;
-    resolved_to: { id: number; label: string } | null;
-    ambiguous: boolean;
-    alternatives: { id: number; label: string }[];
-  };
-  fetched_at: string;
-  stale: boolean;
-  stale_reason?: string;
-  source_url: string | null;
-};
 
 let requested: string[];
 
@@ -57,10 +34,10 @@ async function connect(fetchImpl: FetchImpl, readCityDataset = dataset): Promise
   return client;
 }
 
-async function search(client: Client, args: Record<string, unknown>): Promise<SearchResult> {
+async function search(client: Client, args: Record<string, unknown>): Promise<SearchListingsResult> {
   const result = await client.callTool({ name: "search_listings", arguments: args });
   expect(result.isError).toBeFalsy();
-  return result.structuredContent as unknown as SearchResult;
+  return result.structuredContent as unknown as SearchListingsResult;
 }
 
 beforeEach(() => {

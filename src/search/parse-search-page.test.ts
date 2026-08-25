@@ -14,8 +14,8 @@ const fixture = (name: string): string =>
 /** Fixed so `Heute` and `Gestern` resolve against a known Berlin day. */
 const NOW = new Date("2026-08-25T12:00:00Z");
 
-const parse = (name: string, page = 1, degenerate_form = false) =>
-  parseSearchPage(fixture(name), { page, degenerate_form, now: NOW });
+const parse = (name: string, page = 1, degenerateForm = false) =>
+  parseSearchPage(fixture(name), { page, degenerateForm, now: NOW });
 
 describe("the rows of a search results page", () => {
   it("drops the slots that carry no ad id, silently", () => {
@@ -102,7 +102,7 @@ describe("the rows of a search results page", () => {
       "</body>",
       "<script>Belen.Search.SrpView.init({isWantedAdType: true});</script></body>",
     );
-    const page = parseSearchPage(doctored, { page: 1, degenerate_form: false, now: NOW });
+    const page = parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW });
     expect(page.listings.every((listing) => listing.listing_type === "OFFER")).toBe(true);
   });
 
@@ -151,7 +151,7 @@ describe("the results summary", () => {
       /1 - 25 von 39\.183[^<]*/u,
       "1 - 25 von 2.293.257 Comics in Deutschland",
     );
-    const page = parseSearchPage(doctored, { page: 1, degenerate_form: false, now: NOW });
+    const page = parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW });
     expect(page.total).toBe(2293257);
     expect(JSON.stringify(page)).not.toContain("Comics");
   });
@@ -166,7 +166,7 @@ describe("the results summary", () => {
         "</body>",
         '<div class="browsebox"><span class="j-count">793.124</span></div></body>',
       );
-    const page = parseSearchPage(doctored, { page: 1, degenerate_form: false, now: NOW });
+    const page = parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW });
     expect(page.total).toBe(39183);
   });
 });
@@ -182,7 +182,7 @@ describe("the page-50 clamp", () => {
 
   it("needs no previous page: the same body clamps or does not by the page asked for", () => {
     const body = fixture("search-page-51-clamped");
-    const options = { degenerate_form: false, now: NOW };
+    const options = { degenerateForm: false, now: NOW };
     expect(parseSearchPage(body, { ...options, page: 50 }).clamped).toBe(false);
     expect(parseSearchPage(body, { ...options, page: 51 }).clamped).toBe(true);
     expect(parseSearchPage(body, { ...options, page: 100 }).clamped).toBe(true);
@@ -213,12 +213,42 @@ describe("an empty result", () => {
 describe("the loud failures", () => {
   it("throws when the summary is gone", () => {
     const doctored = fixture("search-page-1").replaceAll("breadcrump-summary", "moved-on");
-    expect(() => parseSearchPage(doctored, { page: 1, degenerate_form: false })).toThrow(ParseError);
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false })).toThrow(ParseError);
   });
 
   it("throws when the summary carries no range", () => {
     const doctored = fixture("search-page-1").replace(/1 - 25 von 39\.183[^<]*/u, "Ergebnisse");
-    expect(() => parseSearchPage(doctored, { page: 1, degenerate_form: false })).toThrow(ParseError);
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false })).toThrow(ParseError);
+  });
+
+  it("throws when an organic row lost its date cell, which only a TOP row honestly lacks", () => {
+    // A TOP row's empty date cell is normal; the same emptiness on an organic
+    // row is a DOM change and must not arrive as null (SPEC 3.3's correction).
+    const doctored = fixture("search-page-1").replaceAll(
+      /<i class="icon icon-small icon-calendar-open"[^>]*><\/i>\s*(Heute|Gestern)[^\n<]*/gu,
+      "",
+    );
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
+      /organic row \d+ has no posting date/u,
+    );
+  });
+
+  it("throws when a row has a description on neither surface", () => {
+    const doctored = fixture("search-page-1")
+      .replaceAll(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gu, "")
+      .replaceAll(/<p class="aditem-main--middle--description">[\s\S]*?<\/p>/gu, "");
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
+      /has no description on either surface/u,
+    );
+  });
+
+  it("throws when the results container is gone and the page never says nothing matched", () => {
+    // Otherwise a renamed container would arrive as a quiet `total: 0` instead
+    // of the loud failure a DOM change owes the operator (SPEC 5.8).
+    const doctored = fixture("search-empty").replace("Es wurden keine Ergebnisse", "Ergebnisse");
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false })).toThrow(
+      /does not say nothing matched/u,
+    );
   });
 
   it("throws on the degenerate `1 - 1 von 1` signature, never returning it as data", () => {
@@ -226,10 +256,10 @@ describe("the loud failures", () => {
     // is not a number that query can honestly produce (SPEC 5.7).
     const doctored = fixture("search-page-1").replace(/1 - 25 von 39\.183[^<]*/u, "1 - 1 von 1");
     const options = { page: 1, now: NOW };
-    expect(() => parseSearchPage(doctored, { ...options, degenerate_form: true })).toThrow(
+    expect(() => parseSearchPage(doctored, { ...options, degenerateForm: true })).toThrow(
       ParseError,
     );
     // The same page from a query that could honestly return one is data.
-    expect(parseSearchPage(doctored, { ...options, degenerate_form: false }).total).toBe(1);
+    expect(parseSearchPage(doctored, { ...options, degenerateForm: false }).total).toBe(1);
   });
 });
