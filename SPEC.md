@@ -185,6 +185,10 @@ Two properties do the work, and they are the reason this is a union rather than 
 
 Every listing has exactly one shape; the shape is never missing. Source: `adPriceType` in the detail page's JS init (`FIXED` | `NEGOTIABLE` | `GIVE_AWAY` | `''`), and the rendered price string on a search row.
 
+> **Correction, recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** **`GIVE_AWAY` is a price type a seller chose, not the giveaway category.** A listing in *Zu verschenken* (`c192`) carries `adPriceType: ''` and renders no `#viewad-price` element, so it reads `Unpriced` — while a listing in an ordinary category whose seller picked "Zu verschenken" carries `GIVE_AWAY` and renders that string. Both are free; only the second says so in a field, and neither is inferred from the other.
+>
+> On the detail page the two sources are read **together**: the shape and the amount come from the init, and the rendered string is held against the shape as a second opinion. A page where they disagree is a page the parser no longer understands, and it fails loudly (§5.8) rather than picking a winner.
+
 A **price drop** is a previous higher price shown struck through. It is carried as `old_price?: Price` and appears only where the site renders one.
 
 ### 3.2 Posting date — two precisions, one timezone
@@ -257,6 +261,12 @@ type Listing = {
 
 **Images are exactly what the page gave.** Search returns the `$_2` thumbnail plus `image_count`; `get_listing` returns the large gallery URLs plus the count. Stripping `rule=` and documenting the size grammar would mean owning a URL vocabulary we neither control nor version.
 
+> **Correction, recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** Three readings of `Listing` did not survive contact with the live detail page.
+>
+> - **`old_price` never appears from this surface.** The detail page renders no struck-through price at all — the price drop is markup on a *search row*, and the only struck-through prices on a detail page belong to the seller's other listings and the related-ads block at its foot, both of which are results-page markup for listings nobody asked for. The field stays optional on the type and is simply never present here.
+> - **The posting date is picked out of `#viewad-extra-info`, not read as the whole of it.** The view counter shares that element and is filled in by script after load, so the date is the `DD.MM.YYYY` token inside it (SPEC 5.5's rule: read numbers off the markup).
+> - **Boolean feature tags are not attributes and are not returned.** `.checktaglist .checktag` carries label-only booleans — `Anhängerkupplung`, `Balkon` — with no value beside them. `attributes` is a label/value list, and returning `{ label: "Balkon", value: "" }` would invent a shape the page does not have. Their absence is a known gap, not an oversight.
+
 ### 3.4 Listing states — no enum, three flags
 
 ```ts
@@ -274,6 +284,10 @@ type ListingFlags = {
 - **Expired / Paused** are readable — `adExpired` / `showPausedVeil` are present on a public page. Prior research only ever sampled live ads, so "always false" was unverified, not unavailable.
 - **Deleted** is detectable only as "this URL no longer yields a listing", never as a reason. See §5.3.
 - **Sold is not a state.** Kleinanzeigen publishes none. `data-soldlabel` is a *label template* — the wording an ad would use if its seller marked it sold — a category hint, not a status. Sellers signal sold or reserved by editing the title, and that convention is the only signal a reader gets.
+
+> **Correction, recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** **The veils are set on pages still being served.** `showDeletedVeil: true` was read off a live, publicly readable listing during fixture capture — prior research had only ever sampled ads where all three were `false`, and "always false" was an artefact of that sample. A `deleted_veil` listing is *not* the `gone` case: `gone` is a URL that no longer yields a listing at all (§5.3), while this is a page that still answers, still parses, and says of itself that it is veiled.
+>
+> The same page also settles `data-soldlabel`'s one legitimate use: it is read for `Gefunden` — the want-listing marker §5.1 prescribes — and for nothing else. No state, no availability, no `sold` field.
 
 ### 3.5 Seller and shop
 
@@ -302,6 +316,13 @@ type Shop = {
 `seller_type` is an **enum, not a boolean**: "not private" is a weaker claim than "commercial", and a seller type that cannot be read is unknown rather than private.
 
 **`shop_slug` is case-sensitive and may carry a numeric collision suffix — never normalise it.** Two different sellers both named byte-identically `Autohaus Meyer GmbH` live at `/pro/Autohaus-Meyer-GmbH` and `/pro/autohaus-meyer-gmbh-1`.
+
+> **Correction, recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** **`seller_id` lives in two different elements, and neither is on both kinds of page.**
+>
+> - A **private** seller's id is in the link to their own listings: `href="/s-bestandsliste.html?userId=<id>"`, which is the page's only appearance of it. `userId` in the JS init is present and **empty** on every page sampled, private and commercial alike, so it is never a source.
+> - A **commercial** seller has no such link at all. Their id is `data-user-id` on `#viewad-commercial-policy-documents`, the element behind the imprint dialog — verified equal to the `sellerId` their `/pro/` page's island props carry.
+>
+> Reading only the first would have returned `seller_id: null` for every commercial listing, which is the shortfall this correction exists to prevent rather than to record.
 
 ### 3.6 The envelope
 
@@ -599,6 +620,10 @@ So there are **three decoders**: cheerio over HTML, devalue island props, devalu
 A missing or deleted listing does not 404 and leaves no tombstone. It **301s to a synthesised browse page** and answers **HTTP 200 with a full page of *other* listings**. Verified: `/s-anzeige/foo/1000000000-217-4070` → 301 → `/s-fahrraeder/weisswasser/c217l4069`, 200, a full results page.
 
 > **`get_listing` MUST assert that the final URL after redirects still starts with `/s-anzeige/`.** If it does not, return `{ status: "gone" }` and parse nothing.
+
+> **Recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** The assertion is on the **origin and the path**, not the path alone — a bare prefix check accepts `https://kleinanzeigen.de.example.com/s-anzeige/…`. Two further readings come with it: a response that cannot say where it ended up is a **failure**, never a `gone` (only "we looked, and it is not a listing" is an answer); and a page that *is* a listing detail page has to agree it is the listing that was asked for, which is the same failure one redirect further along.
+>
+> Both redirect targets are confirmed live: `/s-anzeige/x/1000000000` → `301` → the homepage, HTTP 200; `/s-anzeige/foo/1000000000-217-4070` → `301` → `/s-fahrraeder/weisswasser/c217l4069`, HTTP 200, a full results page.
 
 A detail-fetch tool without this guard will confidently return the wrong listing.
 
