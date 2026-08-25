@@ -20,7 +20,8 @@
     "generate:category-tree": "node scripts/generate-category-tree.ts",
     "generate:cities": "node scripts/generate-cities.ts",
     "capture:search-fixtures": "node --experimental-transform-types scripts/capture-search-fixtures.ts",
-    "capture:listing-fixtures": "node --experimental-transform-types scripts/capture-listing-fixtures.ts"
+    "capture:listing-fixtures": "node --experimental-transform-types scripts/capture-listing-fixtures.ts",
+    "capture:shop-fixtures": "node --experimental-transform-types scripts/capture-shop-fixtures.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

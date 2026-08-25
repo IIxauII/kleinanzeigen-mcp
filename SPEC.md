@@ -487,6 +487,14 @@ The RPC's filters are genuinely server-side, so §2.6's rule admits them. This d
 
 **Result** — `Envelope & { shop: Shop; listings: SearchRow[]; page: number; count: number }`.
 
+> **Correction, recorded while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)).** **The result shape above outruns what the two shop encodings carry, in three places.** Each was found by decoding live payloads, and each is a field the surface does not have rather than one the parser failed to read.
+>
+> - **`listings` are not `SearchRow`s.** The island and the RPC carry twelve fields per listing between them — `id`, `url`, `title`, `description`, `price`, `date`, `location`, `image`, `retinaImage`, `imageCount`, `hasVirtualTour`, `tags` — and four a `SearchRow` needs are in neither: there is **no shipping tag, no `Gesuch` marker, no postcode and no promoted slot** anywhere on the shop surface. Defaulting them would put `shipping: false` on a listing that ships and `listing_type: "OFFER"` on a want listing, so the tool returns a **`ShopRow`**: the ten fields that are really there, plus the one a search row has no equivalent for — `tags`, the size a clothing or footwear listing is filed under. Absent, not guessed, is the same reading that makes an unreadable seller type unknown rather than private (§3.5).
+> - **`shop` is `Shop | null`, and is non-null only where the shop page answered.** The profile lives in the page's islands and **the RPC carries none of it** — no name, no seller id, no logo, no prose. The shop page in turn renders one thing only: the shop's first 25 listings, *unfiltered*. So the island answers page 1 with no filters and the RPC answers everything else, and a profile on a deeper or a filtered page would cost a second request behind one call — the hidden multiplier §2.5 refuses. A caller wanting both asks twice, knowingly, at one request each.
+> - **The RPC's price bounds are strings on the wire.** `minPrice`/`maxPrice` are validated as `string` and a numeric bound is refused with HTTP 400 and a field-level complaint; `categoryId`/`locationId` are validated as `number` and a string id is refused the same way. `keywords`, `categoryId`, `locationId`, `minPrice` and `maxPrice` are all confirmed genuinely server-side.
+>
+> One further reading, which is why `Shop.categories` can keep its promise: **`categoriesSearchData` is a breakdown of the answered query, not a fixed property of the shop.** Unfiltered it names top-level categories and sums exactly to `adsOnline`; under a `categoryId` filter it drops a level and names that category's *subcategories*, summing to the filtered set. Only the unfiltered reading reaches a caller, so the sum §5.1 states holds for every `Shop` this tool returns.
+
 **Description**
 
 ```
@@ -608,11 +616,27 @@ These have appeared identically across five languages of scraper spanning 2021�
 
 So there are **three decoders**: cheerio over HTML, devalue island props, devalue-flattened RPC.
 
+> **Correction, recorded while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)).** **Three decoders is right; the shop page's own is not one island and is not the flattened encoding.**
+>
+> - **The island props are a `[type, value]` pair per value, applied recursively** — `{"adsOnline":[0,30]}`, `{"ads":[1,[[0,{…}],…]]}` — and a one-element pair, `[0]`, is a value the page does not have. Type `0` and type `1` are the only codes the shop page uses; Astro spells `Date`, `Map`, `Set`, `RegExp`, `BigInt` and `URL` under codes of their own, and an unrecognised code is a loud failure rather than a value read as the string it resembles (§5.8). This is a *different* shape from the flattened RPC's index table, which is the point §5.1 was already making.
+> - **The profile is spread over three islands, not one.** `BrandProfilePage` carries `brandName`, `sellerId`, `storeId`, `sellerType`, `adsOnline`, `about` and `initialAds`; the shop's **name and logo are not in it** — they are `title` and `logoUrl` on `ProfileActions`, with the name repeated as `companyName` on `UserBadges` for a page that renders no profile actions. Islands are found by the **stable name in `opts`**, never by `component-url`, which carries a build hash and moves with every deploy.
+> - **`about` is nested and `storeId` is mislabelled elsewhere.** The prose is `about.description`, not `about`. And the `BrandingProfileContact` island calls the *store* id `sellerId` — for the shop sampled it reads `219685`, the `storeId`, while the seller id is `163073336`. Only `BrandProfilePage`'s spelling is read.
+> - **`brandName` echoes the slug that was asked for**, not a canonical spelling of it: `/pro/Autohaus-CCC-GmbH` and `/pro/autohaus-ccc-gmbh` both answer with seller `82731513` and each says its own slug back. The site resolves a slug case-insensitively; **that is not licence to normalise one**, because the *numeric collision suffix* is still load-bearing (§3.5).
+> - **`initialShowcasedAds` and `contactPerson` are also in the props**, and nothing reads either: the first is listings already in `initialAds`, the second is a named employee, their photograph and their bio.
+
 ### 5.2 The `/pro/` page does not paginate
 
 `?pageNum=2` and `?page=2` return byte-identical page 1; `/pro/<slug>/seite:2` → **404**. Page 1 alone would cap a Decathlon-sized shop at 25 of 170. Paging is the RPC or nothing.
 
 `POST /_actions/proPublicWeb.brandProfile.getAds/` takes `{ brandName, keywords, categoryId, locationId, minPrice, maxPrice, pageSize, pageNum }`, honours `pageSize` past the UI's 25 (100 verified), and terminates cleanly past the end — page 8 of a 170-listing shop returns 0 listings in 505 bytes.
+
+> **Correction, recorded while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)).** **A slug that names no shop has §5.3's failure mode, and the shop surface needed §5.3's guard.**
+>
+> `/pro/dieser-shop-gibt-es-nicht-xyz123` answers **HTTP 200** with a complete 111 kB page: header, footer, and a `BrandProfilePage` island whose props are profile-*shaped* — `adsOnline: 0`, `initialAds: null`, no `sellerId`, no `storeId`, and **`sellerType` flipped from `"commercial"` to `"private"`**. That last field is the trap: read on its own it says a private seller was found, when what happened is that no seller was found at all. There is no 404 and no tombstone, exactly as for a deleted listing.
+>
+> So the identity is the reading: **a shop page that names no `sellerId` is not a shop**, and nothing else on it is parsed. The result is `status: "gone"` — a normal result, not an error (§6.3). The final URL after redirects is asserted the same way §5.3 asserts a listing's, on the **origin and the path** together, and a response that cannot say where it ended up is a failure rather than a `gone`.
+>
+> **The RPC's answer to the same slug is HTTP 204 with a zero-byte body**, which §4.5 already rules is an error and never zero results — reported as an empty page it would say a shop is empty that nobody looked at. The rule now lives in the request path, once, so every surface inherits it. It also means an unknown slug is `gone` on page 1 and an `http_error` on a deeper page: the RPC's 204 cannot distinguish "no such brand" from a request it declined to serve, and guessing between them is not this server's to do.
 
 ### 5.3 The deleted-ad guard
 
@@ -833,7 +857,7 @@ These are the things a user will hit. None is a bug.
 11. **Three site-side label bugs are live today** (§5.5) and more may exist. The mitigation is structural: read numbers, never labels.
 12. **The `shippingCarrier` enum could widen without warning.** It is a server-side closed set, so a new carrier arrives as a 400 on a value we never send — invisible rather than breaking. The cheap standing check is the `Paketdienst` facet group on `/s-k0`, one allowed request.
 13. **Umlaut folding in `find_shop` is uncharacterised.** `köln` → 492, `koln` → 3. Pass the caller's string through.
-14. **Shop inventory totals do not reconcile.** One shop reports `18 Anzeigen online` on `/pro/`, 17 rows via the (refused) Bestandsliste, and `71 Anzeigen gesamt` separately. Three counts, no known authority — so `ads_online` is reported as the site states it and is not promised to equal `listings.length` summed over pages.
+14. **Shop inventory totals do not reconcile.** One shop reports `18 Anzeigen online` on `/pro/`, 17 rows via the (refused) Bestandsliste, and `71 Anzeigen gesamt` separately. Three counts, no known authority — so `ads_online` is reported as the site states it and is not promised to equal `listings.length` summed over pages. A **fourth** figure was seen while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)): the shop directory's `liveAds` read `11` for a shop whose own `adsOnline` read `10` minutes later. One listing expiring in between would explain it, so it is recorded rather than claimed.
 15. **How deep the shop RPC goes before clamping is unprobed.** `pageSize` is honoured to at least 100 and it terminates cleanly past the end, but the largest shop sampled had 170 listings, so no analogue of the page-50 wall has been ruled out.
 16. **No radius-free rural fallback beyond what the site gives.** `?radius=` covers this properly; but note kleinanzeigen's own catchment is administrative containment, and only 5 `Kr.` nodes exist in Bayern's 2 079 children.
 
