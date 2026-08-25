@@ -11,7 +11,7 @@ import { toolError, toolResult } from "./tool-result.ts";
 /** SPEC 4.2, verbatim. */
 export const GET_LISTING_DESCRIPTION = "One listing in full, by ad id.";
 
-export const LISTING_STATUSES = ["ok", "gone"] as const;
+const LISTING_STATUSES = ["ok", "gone"] as const;
 
 /**
  * `Envelope & ({ status: "ok" } & Listing | { status: "gone" })` (SPEC 4.2),

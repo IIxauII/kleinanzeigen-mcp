@@ -30,11 +30,11 @@ describe("one listing, read off its detail page", () => {
     const listing = parse("listing-private-offer");
     expect(listing).toMatchObject({
       ad_id: "3400000000",
-      url: "https://www.kleinanzeigen.de/s-anzeige/synthetisches-inserat-0/3400000000-217-4070",
+      url: "https://www.kleinanzeigen.de/s-anzeige/synthetisches-inserat-0/3400000000-217-4000",
       title: "Synthetisches Inserat 0",
       price: { kind: "Fixed", amount: 730 },
       category_id: 217,
-      location_id: 4070,
+      location_id: 4000,
       postcode: "10000",
       location_name: "Königsbrück",
       posted: { value: "2026-08-24", precision: "day" },
@@ -105,6 +105,15 @@ describe("the price", () => {
 
   it("is a giveaway where the site says so", () => {
     expect(parse("listing-giveaway-veiled").price).toEqual({ kind: "Giveaway" });
+  });
+
+  it("keeps the init's reading where the page renders a price it cannot read", () => {
+    // An unknown price *wording* is not a disagreement — the init has already
+    // said what the shape is, and losing the whole listing over the string
+    // beside it would be the parser failing louder than the fault (SPEC 5.8).
+    const doctored = fixture("listing-private-offer").replace(">\n    730 €<", ">\n    Preis auf Anfrage<");
+    expect(doctored).toContain("Preis auf Anfrage");
+    expect(parse("listing-private-offer", doctored).price).toEqual({ kind: "Fixed", amount: 730 });
   });
 
   it("refuses a page whose two price sources disagree", () => {
@@ -217,11 +226,11 @@ describe("the seller", () => {
 
 describe("the ids in the URL", () => {
   it("reads the third number as the location id, never as a user id", () => {
-    // The seller id is 21000000 on this fixture; 4070 is where the listing is
+    // The seller id is 21000000 on this fixture; 4000 is where the listing is
     // (SPEC 3.3, CONTEXT.md).
     const listing = parse("listing-private-offer");
-    expect(listing).toMatchObject({ category_id: 217, location_id: 4070 });
-    expect(listing.seller.seller_id).not.toBe(4070);
+    expect(listing).toMatchObject({ category_id: 217, location_id: 4000 });
+    expect(listing.seller.seller_id).not.toBe(4000);
   });
 
   it("agrees with the category the init states, which is a second source for it", () => {
@@ -255,10 +264,21 @@ describe("the deleted-ad guard", () => {
 
   it("refuses a response that cannot say where it ended up, rather than calling it gone", () => {
     // "We could not tell" is a failure; only "we looked, and it is not a
-    // listing" is an answer.
-    expect(() =>
-      parseListingPage(fixture("listing-wanted"), { finalUrl: "", ad_id: "3400000002" }),
-    ).toThrow(ParseError);
+    // listing" is an answer — including when the redirects came to rest on a
+    // host that is not the site's.
+    for (const finalUrl of ["", "https://kleinanzeigen.de.example.com/s-anzeige/x/3400000002"]) {
+      expect(() => parseListingPage(fixture("listing-wanted"), { finalUrl, ad_id: "3400000002" })).toThrow(
+        ParseError,
+      );
+    }
+  });
+
+  it("parses a listing served from the site's apex host", () => {
+    const result = parseListingPage(fixture("listing-wanted"), {
+      finalUrl: "https://kleinanzeigen.de/s-anzeige/x/3400000002",
+      ad_id: "3400000002",
+    });
+    expect(result.status).toBe("ok");
   });
 
   it("refuses a listing page that is not the listing that was asked for", () => {

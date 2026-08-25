@@ -26,7 +26,7 @@ import * as cheerio from "cheerio";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { listingUrl } from "../src/listing/listing-url.ts";
-import { INIT_KEYS } from "../src/listing/view-ad-init.ts";
+import { INIT_KEYS, VIEW_AD_INIT } from "../src/listing/view-ad-init.ts";
 import { raw } from "./capture-raw.ts";
 import { redactor } from "./redact.ts";
 
@@ -71,7 +71,7 @@ const UNREAD_KEYS = ["isWantedAdType", "adL1CategoryId", "adL2CategoryId"] as co
  * is tested against the real thing rather than a tidied copy.
  */
 function initBlock(body: string, adId: string): string {
-  const block = /Belen\.Search\.ViewAdView\.init\(\{([\s\S]*?)\n\s*\}\);/u.exec(body);
+  const block = VIEW_AD_INIT.exec(body);
   if (block === null) throw new Error("no Belen.Search.ViewAdView.init({…}) block");
   const lines = block[1]!
     .split("\n")
@@ -182,11 +182,14 @@ function minimise($: cheerio.CheerioAPI, name: string, index: number, body: stri
 
   const canonical = $('meta[property="og:url"]').first().attr("content");
   if (canonical === undefined) throw new Error(`${name}: no og:url`);
-  // The category and location codes stay: they are taxonomy rather than
-  // identity, and **the third one is the location id** (SPEC 3.3).
-  const codes = /\/(\d+)(-\d+-\d+)?$/u.exec(new URL(canonical).pathname);
+  // The category code stays — it is taxonomy, and a test holds it against the
+  // one the init states. **The third code is the location id** (SPEC 3.3), and
+  // a location id *is* the exact location (CONTEXT.md), so it is replaced like
+  // the postcode and the place name beside it.
+  const codes = /\/(\d+)(?:-(\d+)-(\d+))?$/u.exec(new URL(canonical).pathname);
   if (codes === null) throw new Error(`${name}: og:url carries no ad id`);
-  const url = `https://www.kleinanzeigen.de/s-anzeige/${redact.slug(index)}/${adId}${codes[2] ?? ""}`;
+  const placed = codes[2] === undefined ? "" : `-${codes[2]}-${redact.locationId(index)}`;
+  const url = `https://www.kleinanzeigen.de/s-anzeige/${redact.slug(index)}/${adId}${placed}`;
 
   const where = $("#viewad-locality").first();
   where.text(locality(where.text(), redact, index));
