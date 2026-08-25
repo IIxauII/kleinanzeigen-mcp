@@ -32,6 +32,6 @@ export const ENVELOPE_OUTPUT_SHAPE = {
 };
 
 /** The envelope of a result no request was made for: the zero-request resolvers (SPEC 4.4). */
-export function localEnvelope(now: Date = new Date()): Envelope {
-  return { fetched_at: now.toISOString(), stale: false, source_url: null };
+export function localEnvelope(): Envelope {
+  return { fetched_at: new Date().toISOString(), stale: false, source_url: null };
 }

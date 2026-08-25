@@ -17,18 +17,29 @@ export class FetchError extends Error {
   }
 }
 
+/**
+ * One failed attempt, internal to the request path.
+ *
+ * It carries the reason that becomes `stale_reason` if a stale entry exists,
+ * and — for the two retryable statuses only — what the site asked us to wait.
+ * **A block is never constructed as retryable** (SPEC 5.4).
+ */
+export class RequestFailure extends Error {
+  constructor(
+    readonly reason: FailureReason,
+    message: string,
+    readonly retryable = false,
+    readonly retryAfter: number | null = null,
+  ) {
+    super(message);
+    this.name = "RequestFailure";
+  }
+}
+
 /** A parser could not read the page. Thrown by a parse callback, caught by the request path (SPEC 5.8). */
 export class ParseError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ParseError";
-  }
-}
-
-/** An invalid environment: the process refuses to start rather than falling back (SPEC 8.4). */
-export class ConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ConfigError";
   }
 }

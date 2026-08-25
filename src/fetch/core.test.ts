@@ -2,12 +2,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BLOCK_COOLDOWN_MS, BLOCK_MARKER } from "./breaker.ts";
 import { createCache, FRESH_WINDOW_MS } from "./cache.ts";
 import {
+  configureFetchCore,
   createFetchCore,
+  getFetchCore,
   MAX_RETRIES,
   REQUEST_TIMEOUT_MS,
+  resetFetchCore,
   RETRY_AFTER_CAP_MS,
   type FetchImpl,
 } from "./core.ts";
+import { createLimiter, type Limiter } from "./limiter.ts";
+import { sleep } from "./sleep.ts";
 import { FetchError, ParseError } from "./errors.ts";
 import { USER_AGENT } from "../user-agent.ts";
 
@@ -87,12 +92,15 @@ describe("the happy path", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("sends the project's User-Agent, which is not configurable", async () => {
+  it("sends the project's User-Agent, and no other header", async () => {
     const { impl, calls } = scripted(page("total:1"));
     await core(impl).fetch(URL_A, parseTotal);
     const headers = calls[0]!.init.headers as Record<string, string>;
     expect(headers["user-agent"]).toBe(USER_AGENT);
     expect(USER_AGENT).toMatch(/^kleinanzeigen-mcp\/\d+\.\d+\.\d+ \(\+https:\/\/github\.com\//);
+    // No header impersonation: a naked request already answers 200, so every
+    // header beyond the honest one would be dressing up (ADR-0003).
+    expect(Object.keys(headers)).toEqual(["user-agent"]);
   });
 
   it("times the request out rather than hanging an MCP call", async () => {
@@ -146,6 +154,47 @@ describe("the cache", () => {
 });
 
 describe("the limiter, from the core's side", () => {
+  it("never enters the limiter on a fresh cache hit", async () => {
+    const inner = createLimiter(1500);
+    let runs = 0;
+    const limiter: Limiter["run"] = (request, onWait) => {
+      runs++;
+      return inner.run(request, onWait);
+    };
+    const fetchCore = createFetchCore({
+      rateLimitMs: 1500,
+      fetchImpl: scripted(page("total:7")).impl,
+      limiter: { run: limiter },
+    });
+    await fetchCore.fetch(URL_A, parseTotal);
+    expect(runs).toBe(1);
+    await fetchCore.fetch(URL_A, parseTotal);
+    expect(runs).toBe(1);
+  });
+
+  it("measures the gap from the end of the response body, not its headers", async () => {
+    const slowBody = (body: string): Reply => () =>
+      ({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        text: async () => {
+          await sleep(700);
+          return body;
+        },
+      }) as unknown as Response;
+    const { impl, calls } = scripted(slowBody("total:1"));
+    const fetchCore = core(impl);
+    const start = Date.now();
+    const both = Promise.all([
+      fetchCore.fetch(URL_A, parseTotal),
+      fetchCore.fetch(URL_B, parseTotal),
+    ]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    await both;
+    expect(calls.map((call) => call.at)).toEqual([start, start + 700 + 1500]);
+  });
+
   it("spaces two different URLs by the configured gap", async () => {
     const { impl, calls } = scripted(page("total:1"));
     const fetchCore = core(impl);
@@ -258,6 +307,32 @@ describe("the block breaker", () => {
     expect(logged("breaker_open")[0]).toMatchObject({ cooldown_left_ms: BLOCK_COOLDOWN_MS });
   });
 
+  it("refuses a request that was already queued when the block landed", async () => {
+    const { impl, calls } = scripted(blocked(), page("total:9"));
+    const fetchCore = core(impl);
+    const both = Promise.all([
+      settled(fetchCore.fetch(URL_A, parseTotal)),
+      settled(fetchCore.fetch(URL_B, parseTotal)),
+    ]);
+    await vi.advanceTimersByTimeAsync(60_000);
+    const [first, second] = await both;
+    expect(first).toMatchObject({ reason: "block" });
+    expect(second).toMatchObject({ reason: "block" });
+    // The queued one never reached the network: one socket, not two.
+    expect(calls).toHaveLength(1);
+  });
+
+  it("refuses a retry whose backoff was still running when the block landed", async () => {
+    const { impl, calls } = scripted(page("boom", { status: 503 }), blocked(), page("total:9"));
+    const fetchCore = core(impl);
+    const retrying = settled(fetchCore.fetch(URL_A, parseTotal));
+    const blocking = settled(fetchCore.fetch(URL_B, parseTotal));
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await blocking).toMatchObject({ reason: "block" });
+    expect(await retrying).toMatchObject({ reason: "block" });
+    expect(calls.map((call) => call.url)).toEqual([URL_A, URL_B]);
+  });
+
   it("lets a request through once the cooldown has run out", async () => {
     const { impl, calls } = scripted(blocked(), page("total:5"));
     const fetchCore = core(impl);
@@ -322,5 +397,19 @@ describe("the one stale-serve rule", () => {
     const second = await fetchCore.fetch(URL_A, parseTotal);
     expect(second.envelope.fetched_at).toBe(fresh.envelope.fetched_at);
     expect(second.envelope).toEqual(first.envelope);
+  });
+});
+
+describe("the process-global core", () => {
+  afterEach(resetFetchCore);
+
+  it("is the same core for every tool that asks for it", () => {
+    const configured = configureFetchCore({ rateLimitMs: 1500 });
+    expect(getFetchCore()).toBe(configured);
+  });
+
+  it("refuses to hand out a core before startup configured one", () => {
+    resetFetchCore();
+    expect(() => getFetchCore()).toThrow(/not configured/);
   });
 });
