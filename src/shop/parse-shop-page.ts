@@ -1,6 +1,7 @@
 import * as cheerio from "cheerio";
 import { ParseError } from "../fetch/errors.ts";
 import { islandProps } from "./island-props.ts";
+import { optionalString } from "./read.ts";
 import { readFinalUrl } from "./shop-request.ts";
 import { readShopAds } from "./shop-ads.ts";
 import type { Shop, ShopRow } from "./shop.ts";
@@ -43,9 +44,6 @@ const BADGES_ISLAND = "UserBadges";
 
 /** `sellerType` as the site spells it on a shop page. Anything else is not a shop (SPEC 3.5). */
 const COMMERCIAL = "commercial";
-
-const optionalString = (value: unknown): string | null =>
-  typeof value === "string" && value !== "" ? value : null;
 
 /**
  * `storeId` arrives as a string here and as a number nowhere — and it is *not*

@@ -2,6 +2,7 @@ import { ParseError } from "../fetch/errors.ts";
 import { parsePostingDate } from "../search/posting-date.ts";
 import { parsePrice } from "../search/price.ts";
 import { ORIGIN } from "../search/search-url.ts";
+import { integer, list, record, string } from "./read.ts";
 import type { ShopCategorySchema, ShopRow } from "./shop.ts";
 import type { z } from "zod";
 
@@ -21,30 +22,6 @@ type Category = z.infer<typeof ShopCategorySchema>;
 export type ShopAds = {
   listings: ShopRow[];
   categories: Category[];
-};
-
-const record = (value: unknown, what: string): Record<string, unknown> => {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new ParseError(`${what} is not an object`);
-  }
-  return value as Record<string, unknown>;
-};
-
-const list = (value: unknown, what: string): unknown[] => {
-  if (!Array.isArray(value)) throw new ParseError(`${what} is not a list`);
-  return value;
-};
-
-const string = (source: Record<string, unknown>, key: string, what: string): string => {
-  const value = source[key];
-  if (typeof value !== "string" || value === "") throw new ParseError(`${what} has no ${key}`);
-  return value;
-};
-
-const integer = (source: Record<string, unknown>, key: string, what: string): number => {
-  const value = source[key];
-  if (typeof value !== "number" || !Number.isInteger(value)) throw new ParseError(`${what} has no ${key}`);
-  return value;
 };
 
 /**

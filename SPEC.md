@@ -917,6 +917,12 @@ Never settled explicitly. [#4](https://github.com/IIxauII/kleinanzeigen-mcp/issu
 
 Neither yields an honest empty set; both yield a plausible wrong answer. That is the seam.
 
+> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** There is now a **third** refinement, and it sits on the same seam rather than beside it: §4.5's `category_id` and `location_id` are checked against the **bundled** trees, and an id no tree has is refused before a request is spent on it.
+>
+> The site would not `400` such an id — it takes it, filters by it, and answers. That is precisely the problem: the answer is an empty set the caller reads as *no shops in that category*, when what happened is that there is no such category. Plausible wrong answer, not honest empty set.
+>
+> The check is possible because **the directory's filter ids are the same numeric ids** the bundled datasets carry (§4.5), and it costs nothing — no request, and the dataset behind an id that was not given is never read, so a name-only lookup still touches neither (§7). `search_listings` deliberately does **not** make the same check: there the ids ride a URL path code the site resolves for itself, while here they go to filter fields on an action whose id space *is* the bundled one.
+
 ### 11.5 Field naming is `snake_case`, values keep the site's spelling
 
 [#10](https://github.com/IIxauII/kleinanzeigen-mcp/issues/10) mixed `adId` / `categoryId` / `minPrice` with `organic_count` / `location_resolution` / `fetched_at`; [#14](https://github.com/IIxauII/kleinanzeigen-mcp/issues/14) was `snake_case` throughout.
