@@ -1,18 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { foldedMatch, foldForMatch, foldVariants } from "./fold.ts";
+import { foldedMatch, foldVariants } from "./fold.ts";
 
-describe("foldForMatch", () => {
+describe("foldVariants", () => {
   it("folds case and diacritics", () => {
-    expect(foldForMatch("FahrrÄder")).toBe("fahrrader");
-    expect(foldForMatch("Bahn & ÖPNV")).toBe("bahn & opnv");
+    expect(foldVariants("FahrrÄder")).toEqual(["fahrrader", "fahrraeder"]);
+    expect(foldVariants("OPNV")).toEqual(["opnv"]);
   });
 
   it("collapses surrounding and repeated whitespace", () => {
-    expect(foldForMatch("  Auto,   Rad & Boot ")).toBe("auto, rad & boot");
+    expect(foldVariants("  Auto,   Rad & Boot ")).toEqual(["auto, rad & boot"]);
   });
-});
 
-describe("foldVariants", () => {
   it("offers the umlaut-expanded form alongside the stripped one", () => {
     expect(foldVariants("Köln")).toEqual(["koln", "koeln"]);
     expect(foldVariants("Gießen")).toEqual(["gießen", "giessen"]);

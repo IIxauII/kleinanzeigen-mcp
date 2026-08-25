@@ -87,7 +87,9 @@ let loaded: CityDataset | null = null;
  * build-time artefact is not persistence; ADR-0002's invariant is untouched.
  */
 export function loadCityDataset(source: URL | string = CITY_DATASET_PATH): CityDataset {
-  loaded ??= decodeCityDataset(CityDatasetFileSchema.parse(JSON.parse(readFileSync(source, "utf8"))));
+  loaded ??= decodeCityDataset(
+    CityDatasetFileSchema.parse(JSON.parse(readFileSync(source, "utf8"))),
+  );
   return loaded;
 }
 

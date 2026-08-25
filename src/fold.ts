@@ -13,7 +13,7 @@
  *
  * `Köln` folds to `koln`, which is what a caller typing unaccented ASCII writes.
  */
-export function foldForMatch(value: string): string {
+function foldForMatch(value: string): string {
   return stripMarks(value.toLowerCase()).replace(/\s+/gu, " ").trim();
 }
 

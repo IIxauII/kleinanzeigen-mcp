@@ -10,13 +10,18 @@ import { VERSION } from "./version.ts";
  * and no request is made here — each bundled dataset loads on first use
  * (SPEC 7).
  *
- * The two readers are overridable so tests can supply a dataset without a built
- * sidecar file.
+ * Each reader is overridable so a test can supply one dataset without a built
+ * sidecar file — and without passing a positional `undefined` for the other.
  */
-export function createServer(
-  readCategoryTree: () => CategoryTree = loadCategoryTree,
-  readCityDataset: () => CityDataset = loadCityDataset,
-): McpServer {
+export type DatasetReaders = {
+  readCategoryTree?: () => CategoryTree;
+  readCityDataset?: () => CityDataset;
+};
+
+export function createServer({
+  readCategoryTree = loadCategoryTree,
+  readCityDataset = loadCityDataset,
+}: DatasetReaders = {}): McpServer {
   const server = new McpServer(
     { name: "kleinanzeigen-mcp", version: VERSION },
     { capabilities: { tools: {} } },
