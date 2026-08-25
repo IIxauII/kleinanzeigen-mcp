@@ -92,6 +92,15 @@ function resolveLocation(dataset: CityDataset, input: string): z.infer<typeof Lo
  * internal walk and no opaque cursor: a cursor would be a fiction maintained
  * over a source that has none, and `nextCursor: null` can say the walk stopped
  * but never that the page was *clamped*.
+ *
+ * **Drift is the caller's to handle** (SPEC 2.7). A high-volume query slides
+ * its date window while a lazy walk is in progress — 5 of 125 organic rows
+ * were duplicates over a 13-second sweep — and every duplicate is also a
+ * listing missed. Each row carries `ad_id`: a caller walking pages dedupes on
+ * it and reports the **distinct** count, never `pages × 25`. This server does
+ * not dedupe, and the omission is deliberate twice over — a server-side dedupe
+ * needs the query-scoped state ADR-0002 forbids, and the drift is a property
+ * of the source rather than something to hide.
  */
 export function registerSearchListings(server: McpServer, readCityDataset: () => CityDataset): void {
   server.registerTool(

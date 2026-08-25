@@ -233,3 +233,91 @@ describe("the operational failures", () => {
     expect(JSON.stringify(result.content)).toContain("parse_failure");
   });
 });
+
+describe("the server-side filter surface", () => {
+  it("puts every narrowing input on one URL, and asks for it exactly once", async () => {
+    const client = await connect(serving(fixture("search-page-1")));
+    await search(client, {
+      keywords: "hollandrad",
+      category_id: 217,
+      location_id: 3331,
+      radius: 50,
+      min_price: 10,
+      max_price: 900,
+      ad_type: "OFFER",
+      poster_type: "PRIVATE",
+      shipping: true,
+      shipping_carrier: "DHL",
+      buy_now: true,
+      sort: "PRICE_AMOUNT",
+      page: 3,
+    });
+    // Parameter order is the cache key's, not the builder's: the fetch core
+    // normalises before it asks, so two spellings of one query are one entry.
+    expect(requested).toEqual([
+      "https://www.kleinanzeigen.de/s-seite:3/c217l3331" +
+        "?adType=OFFER&buyNowEnabled=true&keywords=hollandrad&maxPrice=900&minPrice=10" +
+        "&posterType=PRIVATE&radius=50&shipping=true&shippingCarrier=DHL&sortingField=PRICE_AMOUNT",
+    ]);
+  });
+
+  it("returns a known-honest empty set as-is, without dropping the parameter that emptied it", async () => {
+    // A commercial seller with a carrier is empty for a structural reason, and
+    // the empty set is the honest answer to what was asked. Retrying it without
+    // `shippingCarrier` would answer a different question and label the result
+    // as this one's (SPEC 5.6).
+    const client = await connect(serving(fixture("search-empty")));
+    const result = await search(client, { poster_type: "COMMERCIAL", shipping_carrier: "DHL" });
+    expect(result).toMatchObject({ listings: [], total: 0, range: null });
+    expect(requested).toEqual([
+      "https://www.kleinanzeigen.de/s-k0?posterType=COMMERCIAL&shippingCarrier=DHL",
+    ]);
+  });
+
+  it("refuses an argument the surface does not have, rather than ignoring it", async () => {
+    // Category attribute filters have no discoverable domain and no working
+    // query-string form, so the argument is absent — and absent means refused,
+    // never accepted-and-ignored (SPEC 2.6).
+    const client = await connect(serving(fixture("search-page-1")));
+    const result = await client.callTool({
+      name: "search_listings",
+      arguments: { keywords: "fahrrad", attributes: { "global.zustand": "new" } },
+    });
+    expect(result.isError).toBe(true);
+    expect(requested).toHaveLength(0);
+  });
+});
+
+describe("what the result deliberately does not carry", () => {
+  it("never returns the applied scope, which is a live label bug", async () => {
+    // `span.breadcrump-summary`'s trailing noun phrase names a different
+    // category on `/s-sammeln/c234`, and echoing the site's own account of what
+    // it did is worse than returning nothing. `location_resolution` is the
+    // guard instead (SPEC 5.5, 11.1).
+    const client = await connect(serving(fixture("search-page-1")));
+    const result = await search(client, { keywords: "fahrrad", location: "Flensburg" });
+    expect(result).not.toHaveProperty("scope");
+    // The fixture's summary reads `… für „fahrrad" in Berlin und Umgebung`, so
+    // the absence below is the label's, not an empty result's — and the guard
+    // #6 asked for arrives as the resolution instead.
+    expect(JSON.stringify(result)).not.toContain("und Umgebung");
+    expect(result.location_resolution).toMatchObject({
+      input: "Flensburg",
+      resolved_to: { id: 714 },
+    });
+  });
+
+  it("does not dedupe, because drift is the caller's and dedupe would need state", async () => {
+    // A walk sees a listing twice when the date window slides under it. Every
+    // row carries `ad_id` so the caller dedupes and reports the distinct count;
+    // a server-side dedupe would need the query-scoped state ADR-0002 forbids
+    // (SPEC 2.7).
+    const drifted = fixture("search-page-1").replaceAll("3400000005", "3400000002");
+    const client = await connect(serving(drifted));
+    const result = await search(client, { keywords: "fahrrad", page: 2 });
+    const ids = result.listings.map((listing) => listing.ad_id);
+    expect(ids.filter((id) => id === "3400000002")).toHaveLength(2);
+    expect(new Set(ids).size).toBe(ids.length - 1);
+    expect(result.organic_count + result.promoted_count).toBe(ids.length);
+  });
+});
