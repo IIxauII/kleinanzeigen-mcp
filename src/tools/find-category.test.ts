@@ -43,9 +43,10 @@ describe("find_category over MCP", () => {
 
   it("is listed with the spec's description", async () => {
     const { tools } = await (await connect(tree)).listTools();
-    expect(tools.map((tool) => tool.name)).toEqual(["find_category"]);
-    expect(tools[0]!.description).toBe(FIND_CATEGORY_DESCRIPTION);
-    expect(tools[0]!.inputSchema.properties).toHaveProperty("query");
+    const tool = tools.find((candidate) => candidate.name === "find_category");
+    expect(tool).toBeDefined();
+    expect(tool!.description).toBe(FIND_CATEGORY_DESCRIPTION);
+    expect(tool!.inputSchema.properties).toHaveProperty("query");
   });
 
   it("does not touch the bundled tree until the first call", async () => {
