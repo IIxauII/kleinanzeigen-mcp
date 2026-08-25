@@ -59,7 +59,7 @@ A stated amount in EUR, not open to offers. `FIXED`.
 Open to offers. The amount is optional: a listing may show `19.990 € VB` or a bare `VB` with no figure at all. It is the only shape whose amount may be missing.
 
 **Giveaway** _(Zu verschenken)_:
-Free. `GIVE_AWAY`. Distinct from a negotiable price with no amount, and distinct from a lending listing.
+Free. `GIVE_AWAY`. Distinct from a negotiable price with no amount, and distinct from a lending listing. Distinct, too, from the **category** of the same German name: a listing in *Zu verschenken* `c192` carries no price field at all and is Unpriced, while `GIVE_AWAY` is a price type a seller picked in an ordinary category. Both are free; only one says so.
 _Avoid_: Free listing, zero price
 
 **Unpriced**:

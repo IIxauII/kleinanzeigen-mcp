@@ -1,12 +1,14 @@
 import { z } from "zod";
+import { SELLER_TYPES } from "../listing/listing.ts";
 import { LISTING_TYPES } from "./search-row.ts";
 
 export const ORIGIN = "https://www.kleinanzeigen.de";
 
-// `ad_type` is the site's own argument spelling (SPEC 4.1), and its values are
-// the listing types `CONTEXT.md` already names — so the enum is that one, not a
-// second copy under a name the glossary tells us to avoid.
-export const POSTER_TYPES = ["PRIVATE", "COMMERCIAL"] as const;
+// `ad_type` and `poster_type` are the site's own argument spellings (SPEC 4.1),
+// and their values are the listing types and seller types `CONTEXT.md` already
+// names — so each enum is that one, not a second copy under a name the
+// glossary tells us to avoid.
+export const POSTER_TYPES = SELLER_TYPES;
 export const SHIPPING_CARRIERS = ["DHL", "HERMES"] as const;
 export const SORTS = ["SORTING_DATE", "PRICE_AMOUNT", "PRICE_AMOUNT_DESC"] as const;
 
