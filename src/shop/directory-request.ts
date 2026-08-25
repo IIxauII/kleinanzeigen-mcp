@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { CategoryTree } from "../categories/category-tree.ts";
-import type { CityDataset } from "../locations/city-dataset.ts";
 import { ORIGIN } from "../search/search-url.ts";
 
 /** The shop directory's search action. No CSRF token, no cookies, no session (SPEC 2.2). */
@@ -17,13 +16,21 @@ const DIRECTORY_ACTION = "/_actions/proPublicWeb.brandingIndex.searchBrandings/"
  */
 export const DIRECTORY_PAGE_SIZE = 50;
 
-/** The shop view, and the only one in scope: `TILE` is the browse surface (SPEC 1, 4.5). */
+/**
+ * `view` is the one field the action refuses to default, and `CARD` is the one
+ * value that answers the question this tool asks: it returns `brandingCards` —
+ * a shop per hit. The enum the action leaked on a bad value has a second entry,
+ * `TILE`, which returns `brandingTiles` instead; that is the directory as a
+ * **browse** surface, which is out of scope on the ToS grounds §1 states, and
+ * its record shape was never read. So `CARD` is fixed here rather than exposed
+ * (SPEC 1, 4.5).
+ */
 const DIRECTORY_VIEW = "CARD";
 
 /**
  * `BRANDING` behaved identically to `BOTH` and did not suppress the prose
  * match, and `ADS` was never sent — so the parameter is unexplored rather than
- * a name-only mode, and nothing here specifies around it (SPEC 11, §4.5).
+ * a name-only mode, and nothing here specifies around it (SPEC 4.5, 10).
  */
 const DIRECTORY_SEARCH_SCOPE = "BOTH";
 
@@ -32,6 +39,11 @@ const BaseArgsSchema = z
   // `search_scope` are fixed in code, and an argument that does not exist must
   // not look answered (SPEC 2.6, 4.5).
   .strictObject({
+    // **Refused when empty**, which §11.4's rule needs stated: the action
+    // treats `fulltext` as optional and answers an omitted one with the whole
+    // 53 808-shop directory rather than with a `400`. That is the browse
+    // surface §1 puts out of scope, and it is not what a caller asking for a
+    // shop by name meant.
     name: z
       .string()
       .min(1)
@@ -44,11 +56,11 @@ const BaseArgsSchema = z
 export type FindShopArgs = z.infer<typeof BaseArgsSchema>;
 
 /**
- * The arguments, with the two filter ids checked against the **bundled** trees.
+ * The arguments, with **`category_id`** checked against the bundled tree.
  *
  * The check is possible at all because **the directory's filter ids are the
  * same numeric ids** the bundled datasets carry, and it costs nothing: no
- * request, and the dataset behind an id that was not given is never even read
+ * request, and the tree is not read at all unless a category id was given
  * (SPEC 4.5, 7).
  *
  * It is worth doing because an id the taxonomy does not have is not a question
@@ -57,13 +69,19 @@ export type FindShopArgs = z.infer<typeof BaseArgsSchema>;
  * happened is that there is no such category — a plausible wrong answer rather
  * than an honest empty set, which is the seam §11.4 draws. `search_listings`
  * does not make this check because its ids ride a URL path code the site
- * resolves for itself; here the id goes to a filter field, and the bundled tree
- * is the same authority the caller got the id from.
+ * resolves for itself; here the id goes to a filter field.
+ *
+ * **`location_id` is deliberately not checked the same way**, and the
+ * difference is the datasets rather than the ids. The category tree is
+ * complete — 159 of 159 nodes, byte-identical to the disallowed tree — while
+ * the city dataset knowingly holds the first two tiers only: sub-Ortsteile
+ * (Wedding `l3503`) and the whole postcode layer are absent from every allowed
+ * source (SPEC 7's correction). Refusing `l3503` would reject an id the
+ * directory filters by and answers honestly, which is the *opposite* of the
+ * failure this check exists to prevent — and a caller can hold such an id
+ * legitimately, since the third number in a listing URL is a location id.
  */
-export function findShopArgsSchema(
-  readCategoryTree: () => CategoryTree,
-  readCityDataset: () => CityDataset,
-): typeof BaseArgsSchema {
+export function findShopArgsSchema(readCategoryTree: () => CategoryTree): typeof BaseArgsSchema {
   return BaseArgsSchema.superRefine((args, ctx) => {
     if (args.category_id !== undefined && !readCategoryTree().some((node) => node.category_id === args.category_id)) {
       ctx.addIssue({
@@ -72,17 +90,15 @@ export function findShopArgsSchema(
         message: `no bundled category has id ${args.category_id}; resolve the name with find_category first`,
       });
     }
-    if (args.location_id !== undefined && !readCityDataset().some((node) => node.location_id === args.location_id)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["location_id"],
-        message: `no bundled location has id ${args.location_id}; resolve the name with find_location first`,
-      });
-    }
   });
 }
 
-export type DirectoryRequest = { url: string; body: Record<string, unknown> };
+export type DirectoryRequest = {
+  url: string;
+  body: Record<string, unknown>;
+  /** The 1-based page this request asks for, resolved here so the default has one home. */
+  page: number;
+};
 
 /**
  * One page of the directory search.
@@ -98,6 +114,7 @@ export type DirectoryRequest = { url: string; body: Record<string, unknown> };
  * bundled dataset and does not reach here.
  */
 export function directoryRequest(args: FindShopArgs): DirectoryRequest {
+  const page = args.page ?? 1;
   const body: Record<string, unknown> = {
     view: DIRECTORY_VIEW,
     fulltext: args.name,
@@ -105,7 +122,7 @@ export function directoryRequest(args: FindShopArgs): DirectoryRequest {
   };
   if (args.category_id !== undefined) body["categoryId"] = args.category_id;
   if (args.location_id !== undefined) body["locationId"] = args.location_id;
-  body["from"] = ((args.page ?? 1) - 1) * DIRECTORY_PAGE_SIZE;
+  body["from"] = (page - 1) * DIRECTORY_PAGE_SIZE;
   body["pageSize"] = DIRECTORY_PAGE_SIZE;
-  return { url: new URL(DIRECTORY_ACTION, ORIGIN).toString(), body };
+  return { url: new URL(DIRECTORY_ACTION, ORIGIN).toString(), body, page };
 }

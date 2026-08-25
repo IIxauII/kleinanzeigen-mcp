@@ -1,7 +1,7 @@
 import { ParseError } from "../fetch/errors.ts";
 
 /**
- * The four readings every shop decoder does, written once (SPEC 5.8).
+ * The five readings every shop decoder does, written once (SPEC 5.8).
  *
  * Both `_actions` endpoints answer in the same flattened encoding and are
  * decoded into ordinary values before anything here runs, so what is left is

@@ -12,10 +12,18 @@ const fixture = (name: string): string =>
  * decoder reads our encoder, so the fixture's own index table is edited in
  * place instead — one slot at a time, exactly the way the capture redacts it.
  */
-function withCardField(name: string, key: string, held: unknown): string {
+type Payload = { values: unknown[]; card: Record<string, number> };
+
+/** The fixture's index table, and the first candidate's key → slot map inside it. */
+function payload(name: string): Payload {
   const values = JSON.parse(fixture(name)) as unknown[];
   const root = values[0] as Record<string, number>;
   const card = values[(values[root["brandingCards"]!] as number[])[0]!] as Record<string, number>;
+  return { values, card };
+}
+
+function withCardField(name: string, key: string, held: unknown): string {
+  const { values, card } = payload(name);
   const slot = card[key];
   if (slot === undefined) throw new Error(`the fixture's first card has no ${key}`);
   values[slot] = held;
@@ -23,9 +31,7 @@ function withCardField(name: string, key: string, held: unknown): string {
 }
 
 function withoutCardField(name: string, key: string): string {
-  const values = JSON.parse(fixture(name)) as unknown[];
-  const root = values[0] as Record<string, number>;
-  const card = values[(values[root["brandingCards"]!] as number[])[0]!] as Record<string, number>;
+  const { values, card } = payload(name);
   delete card[key];
   return JSON.stringify(values);
 }
@@ -103,7 +109,7 @@ describe("the shop directory", () => {
   });
 
   it("is loud about a payload that states no totalHits", () => {
-    const values = JSON.parse(fixture("shop-directory")) as unknown[];
+    const { values } = payload("shop-directory");
     const metadata = values[(values[0] as Record<string, number>)["metadata"]!] as Record<string, number>;
     delete metadata["totalHits"];
     expect(() => parseShopDirectory(JSON.stringify(values))).toThrow(ParseError);

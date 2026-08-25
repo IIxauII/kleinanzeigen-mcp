@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { FIND_CATEGORY_DESCRIPTION } from "./find-category.ts";
 import { FIND_LOCATION_DESCRIPTION } from "./find-location.ts";
-import { GET_LISTING_DESCRIPTION } from "./get-listing.ts";
 import { FIND_SHOP_DESCRIPTION } from "./find-shop.ts";
+import { GET_LISTING_DESCRIPTION } from "./get-listing.ts";
 import { GET_SHOP_DESCRIPTION } from "./get-shop.ts";
 import { SEARCH_LISTINGS_DESCRIPTION } from "./search-listings.ts";
 
@@ -31,7 +31,7 @@ function resolverDescriptionInSpec(tool: string): string {
 
 /** §4.1, §4.2, §4.3 and §4.5 each give their tool's description as a fence of its own, unindented. */
 function descriptionInSpec(section: string, tool: string): string {
-  // The section ends at the next heading of any depth, or at the rule that
+  // The section ends at the next `##` or `###` heading, or at the rule that
   // closes §4 — §4.5 is the last one and has no `###` after it.
   const body = new RegExp(`### ${section.replace(".", "\\.")} \`${tool}\`\\n([\\s\\S]*?)\\n(?:#{2,3} |---\\n)`, "u").exec(spec());
   if (body === null) throw new Error(`SPEC ${section} no longer describes ${tool}`);
