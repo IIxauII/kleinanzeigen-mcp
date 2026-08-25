@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ORIGIN, SITE_HOSTS } from "../search/search-url.ts";
 
 /** The shop page. Private sellers have none (SPEC 2.2, 4.3). */
-const SHOP_PATH = "/pro/";
+export const SHOP_PATH = "/pro/";
 
 /** The paging RPC. No CSRF token, no cookies, no session (SPEC 2.2). */
 const SHOP_ADS_ACTION = "/_actions/proPublicWeb.brandProfile.getAds/";
