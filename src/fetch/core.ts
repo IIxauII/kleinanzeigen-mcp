@@ -1,11 +1,12 @@
-import type { Envelope, FailureReason } from "../envelope.ts";
+import type { Envelope } from "../envelope.ts";
 import { log } from "../logging.ts";
 import { USER_AGENT } from "../user-agent.ts";
-import { createBreaker, isBlockPage, type Breaker } from "./breaker.ts";
-import { createCache, type Cache } from "./cache.ts";
-import { FetchError, ParseError } from "./errors.ts";
+import { createBreaker, isBlockPage } from "./breaker.ts";
+import { createCache, type Cache, type CacheEntry } from "./cache.ts";
+import { FetchError, ParseError, RequestFailure } from "./errors.ts";
 import { createLimiter, type Limiter } from "./limiter.ts";
 import { normaliseUrl } from "./normalise-url.ts";
+import { sleep } from "./sleep.ts";
 
 /** At most 2 retries, and only on 429/5xx. **Never on a block** (SPEC 2.8, 5.4). */
 export const MAX_RETRIES = 2;
@@ -45,14 +46,8 @@ export type FetchCoreOptions = {
   rateLimitMs: number;
   fetchImpl?: FetchImpl;
   limiter?: Limiter;
-  breaker?: Breaker;
   cache?: Cache<unknown>;
 };
-
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 
 /** Seconds, or an HTTP-date. Anything else is no `Retry-After` at all. */
 function retryAfterMs(response: Response): number | null {
@@ -67,23 +62,19 @@ function retryAfterMs(response: Response): number | null {
 
 const isRetryableStatus = (status: number): boolean => status === 429 || status >= 500;
 
-/** Every failure carries the reason that becomes `stale_reason` if a stale entry exists. */
-class Failure extends Error {
-  constructor(
-    readonly reason: FailureReason,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
-function networkFailure(error: unknown): Failure {
+/** Anything thrown that is not already one failed attempt becomes one, keeping its reason. */
+function asFailure(error: unknown): RequestFailure {
+  if (error instanceof RequestFailure) return error;
   const name = error instanceof Error ? error.name : "";
   const message = error instanceof Error ? error.message : String(error);
   return name === "TimeoutError" || name === "AbortError"
-    ? new Failure("timeout", `request timed out after ${REQUEST_TIMEOUT_MS} ms`)
-    : new Failure("network", message);
+    ? new RequestFailure("timeout", `request timed out after ${REQUEST_TIMEOUT_MS} ms`)
+    : new RequestFailure("network", message);
 }
+
+/** The breaker's refusal, which says how much cooldown is left (SPEC 5.4). */
+const refusal = (blockedFor: number): RequestFailure =>
+  new RequestFailure("block", `blocked; ${blockedFor} ms of cooldown left`);
 
 /**
  * The single request path every network tool sits on.
@@ -99,7 +90,7 @@ function networkFailure(error: unknown): Failure {
 export function createFetchCore(options: FetchCoreOptions): FetchCore {
   const fetchImpl = options.fetchImpl ?? ((url, init) => fetch(url, init));
   const limiter = options.limiter ?? createLimiter(options.rateLimitMs);
-  const breaker = options.breaker ?? createBreaker();
+  const breaker = createBreaker();
   const cache = options.cache ?? createCache<unknown>();
 
   /** Backoff starts at the operator's politeness gap and doubles: 1500 ms, then 3000 ms by default. */
@@ -108,50 +99,66 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
   async function attempt<T>(url: string, parse: Parse<T>): Promise<T> {
     const startedAt = Date.now();
     let response: Response;
+    let body: string;
     try {
-      response = await limiter.run(
-        () =>
-          fetchImpl(url, {
-            headers: { "user-agent": USER_AGENT, "accept-language": "de-DE,de;q=0.9" },
+      // The breaker is re-read *inside* the limiter, not before it: a request
+      // that queued while an earlier one was in flight must be refused too,
+      // or the first block would only stop the requests that had not started
+      // queueing yet (SPEC 5.4, ADR-0003).
+      //
+      // The body is read in here as well, so the gap to the next request is
+      // measured from the end of this response rather than from its headers.
+      ({ response, body } = await limiter.run(
+        async () => {
+          const blockedFor = breaker.blockedFor();
+          if (blockedFor !== null) {
+            log("breaker_open", { level: "error", url, cooldown_left_ms: blockedFor });
+            throw refusal(blockedFor);
+          }
+          const sent = await fetchImpl(url, {
+            headers: { "user-agent": USER_AGENT },
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
             redirect: "follow",
-          }),
+          });
+          return { response: sent, body: await sent.text() };
+        },
         (waitedMs) => {
           if (waitedMs > 0) log("limiter_wait", { url, waited_ms: waitedMs });
         },
-      );
+      ));
     } catch (error) {
-      throw networkFailure(error);
+      throw asFailure(error);
     }
-
-    let body: string;
-    try {
-      body = await response.text();
-    } catch (error) {
-      throw networkFailure(error);
-    }
-    log("fetch", { url, status: response.status, ms: Date.now() - startedAt, bytes: body.length });
+    log("fetch", {
+      url,
+      status: response.status,
+      duration_ms: Date.now() - startedAt,
+      bytes: body.length,
+    });
 
     // Checked before the status, because the block presents as HTTP 200 with
     // zero listings just as readily as it does as an error page (SPEC 5.4).
     if (isBlockPage(body)) {
       breaker.trip();
       log("block_detected", { level: "error", url, status: response.status });
-      throw new Failure("block", "kleinanzeigen has blocked this IP range; requests are paused");
+      throw new RequestFailure("block", "kleinanzeigen has blocked this IP range; requests are paused");
     }
 
     if (!response.ok) {
-      const retryAfter = retryAfterMs(response);
-      const failure = new Failure("http_error", `HTTP ${response.status}`);
-      if (!isRetryableStatus(response.status)) throw failure;
-      throw Object.assign(failure, { retryable: true, retryAfter });
+      const status = response.status;
+      throw new RequestFailure(
+        "http_error",
+        `HTTP ${status}`,
+        isRetryableStatus(status),
+        retryAfterMs(response),
+      );
     }
 
     try {
       return parse(body, response);
     } catch (error) {
       const message = error instanceof ParseError ? error.message : String(error);
-      throw new Failure("parse_failure", message);
+      throw new RequestFailure("parse_failure", message);
     }
   }
 
@@ -160,17 +167,15 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
       try {
         return await attempt(url, parse);
       } catch (error) {
-        const failure =
-          error instanceof Failure ? error : new Failure("network", String(error));
-        const retryable = (failure as { retryable?: boolean }).retryable === true;
-        if (!retryable || retry >= MAX_RETRIES) throw failure;
+        const failure = asFailure(error);
+        if (!failure.retryable || retry >= MAX_RETRIES) throw failure;
 
-        const retryAfter = (failure as { retryAfter?: number | null }).retryAfter ?? null;
+        const { retryAfter } = failure;
         if (retryAfter !== null && retryAfter > RETRY_AFTER_CAP_MS) {
           // Sleeping past the cap is indistinguishable from a hang to a client
           // that has no way to learn why (SPEC 2.8).
           log("retry_after_over_cap", { url, retry_after_ms: retryAfter, cap_ms: RETRY_AFTER_CAP_MS });
-          throw new Failure(
+          throw new RequestFailure(
             "http_error",
             `${failure.message}, Retry-After ${retryAfter} ms is past the ${RETRY_AFTER_CAP_MS} ms cap`,
           );
@@ -186,25 +191,29 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
   return {
     async fetch<T>(url: string, parse: Parse<T>): Promise<Fetched<T>> {
       const key = normaliseUrl(url);
-      const cached = cache.get(key) as { value: T; fetched_at: string; fresh: boolean } | null;
+      const cached = cache.get(key) as CacheEntry<T> | null;
       if (cached !== null && cached.fresh) {
         // No request, and the limiter is skipped entirely (SPEC 2.8).
         log("cache_hit", { url: key, fetched_at: cached.fetched_at });
-        return { data: cached.value, envelope: { fetched_at: cached.fetched_at, stale: false, source_url: key } };
+        return {
+          data: cached.value,
+          envelope: { fetched_at: cached.fetched_at, stale: false, source_url: key },
+        };
       }
 
-      const blockedFor = breaker.blockedFor();
-      const failure = blockedFor === null ? null : new Failure("block", `blocked; ${blockedFor} ms of cooldown left`);
-      if (failure !== null) log("breaker_open", { level: "error", url: key, cooldown_left_ms: blockedFor });
-
       try {
-        if (failure !== null) throw failure;
-        const data = await fetchFresh(key, parse);
-        cache.set(key, data);
-        const stored = cache.get(key)!;
-        return { data, envelope: { fetched_at: stored.fetched_at, stale: false, source_url: key } };
+        const blockedFor = breaker.blockedFor();
+        if (blockedFor !== null) {
+          log("breaker_open", { level: "error", url: key, cooldown_left_ms: blockedFor });
+          throw refusal(blockedFor);
+        }
+        const stored = cache.set(key, await fetchFresh(key, parse)) as CacheEntry<T>;
+        return {
+          data: stored.value,
+          envelope: { fetched_at: stored.fetched_at, stale: false, source_url: key },
+        };
       } catch (error) {
-        const failed = error instanceof Failure ? error : new Failure("network", String(error));
+        const failed = asFailure(error);
         // The parser breaking is the one failure a stale serve can hide, so it
         // shouts whether or not the fallback succeeds (SPEC 5.8, ADR-0002).
         if (failed.reason === "parse_failure") {
@@ -213,7 +222,7 @@ export function createFetchCore(options: FetchCoreOptions): FetchCore {
           log("fetch_failed", { url: key, reason: failed.reason, message: failed.message });
         }
 
-        const stale = cache.get(key) as { value: T; fetched_at: string } | null;
+        const stale = cache.get(key) as CacheEntry<T> | null;
         if (stale === null) throw new FetchError(failed.reason, failed.message);
         log("stale_serve", { url: key, reason: failed.reason, fetched_at: stale.fetched_at });
         return {

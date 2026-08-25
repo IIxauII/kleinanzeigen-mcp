@@ -1,4 +1,10 @@
-import { ConfigError } from "./fetch/errors.ts";
+/** An invalid environment: the process refuses to start rather than falling back (SPEC 8.4). */
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
 
 /** Exactly one knob, and this is its name (SPEC 8.4, SPEC 11.3). */
 export const RATE_LIMIT_ENV_VAR = "KLEINANZEIGEN_MCP_RATE_LIMIT_MS";

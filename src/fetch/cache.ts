@@ -12,7 +12,8 @@ export type CacheEntry<T> = {
 
 export type Cache<T> = {
   get(key: string): CacheEntry<T> | null;
-  set(key: string, value: T): void;
+  /** Returns the entry it wrote, so a caller needs no second read to learn its `fetched_at`. */
+  set(key: string, value: T): CacheEntry<T>;
   size(): number;
 };
 
@@ -47,14 +48,16 @@ export function createCache<T>(maxEntries: number = CACHE_MAX_ENTRIES): Cache<T>
         fresh: Date.now() - entry.fetchedAt < FRESH_WINDOW_MS,
       };
     },
-    set(key: string, value: T): void {
+    set(key: string, value: T): CacheEntry<T> {
+      const fetchedAt = Date.now();
       entries.delete(key);
-      entries.set(key, { value, fetchedAt: Date.now() });
+      entries.set(key, { value, fetchedAt });
       while (entries.size > maxEntries) {
         const oldest = entries.keys().next();
         if (oldest.done === true) break;
         entries.delete(oldest.value);
       }
+      return { value, fetched_at: new Date(fetchedAt).toISOString(), fresh: true };
     },
     size: () => entries.size,
   };

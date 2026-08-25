@@ -31,3 +31,17 @@ describe("cache-key normalisation", () => {
     expect(() => normaliseUrl("/s-fahrrad/k0")).toThrow();
   });
 });
+
+describe("what normalisation deliberately leaves alone", () => {
+  it("re-spells nothing: the caller's encoding is what gets fetched", () => {
+    expect(normaliseUrl("https://x.de/s?keywords=damen%20rad&b=1")).toBe(
+      "https://x.de/s?b=1&keywords=damen%20rad",
+    );
+    expect(normaliseUrl("https://x.de/s?q=k%C3%B6ln")).toBe("https://x.de/s?q=k%C3%B6ln");
+    expect(normaliseUrl("https://x.de/s?q=damen+rad")).toBe("https://x.de/s?q=damen+rad");
+  });
+
+  it("keeps a valueless parameter as written", () => {
+    expect(normaliseUrl("https://x.de/s?b&a")).toBe("https://x.de/s?a&b");
+  });
+});
