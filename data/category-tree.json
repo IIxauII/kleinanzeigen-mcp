@@ -1,0 +1,1274 @@
+[
+  {
+    "category_id": 210,
+    "name": "Auto, Rad & Boot",
+    "slug": "auto-rad-boot",
+    "path": "/s-auto-rad-boot/c210",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 216,
+    "name": "Autos",
+    "slug": "autos",
+    "path": "/s-autos/c216",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 223,
+    "name": "Autoteile & Reifen",
+    "slug": "autoteile-reifen",
+    "path": "/s-autoteile-reifen/c223",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 211,
+    "name": "Boote & Bootszubehör",
+    "slug": "boote-bootszubehoer",
+    "path": "/s-boote-bootszubehoer/c211",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 217,
+    "name": "Fahrräder & Zubehör",
+    "slug": "fahrraeder",
+    "path": "/s-fahrraeder/c217",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 305,
+    "name": "Motorräder & Motorroller",
+    "slug": "motorraeder-roller",
+    "path": "/s-motorraeder-roller/c305",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 306,
+    "name": "Motorradteile & Zubehör",
+    "slug": "motorraeder-roller-teile",
+    "path": "/s-motorraeder-roller-teile/c306",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 276,
+    "name": "Nutzfahrzeuge & Anhänger",
+    "slug": "anhaenger-nutzfahrzeuge",
+    "path": "/s-anhaenger-nutzfahrzeuge/c276",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 280,
+    "name": "Reparaturen & Dienstleistungen",
+    "slug": "reparaturen-dienstleistungen",
+    "path": "/s-reparaturen-dienstleistungen/c280",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 220,
+    "name": "Wohnwagen & -mobile",
+    "slug": "wohnwagen-mobile",
+    "path": "/s-wohnwagen-mobile/c220",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 241,
+    "name": "Weiteres Auto, Rad & Boot",
+    "slug": "auto-rad-boot/sonstiges",
+    "path": "/s-auto-rad-boot/sonstiges/c241",
+    "parent_id": 210,
+    "parent_name": "Auto, Rad & Boot"
+  },
+  {
+    "category_id": 297,
+    "name": "Dienstleistungen",
+    "slug": "dienstleistungen",
+    "path": "/s-dienstleistungen/c297",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 288,
+    "name": "Altenpflege",
+    "slug": "altenpflege",
+    "path": "/s-altenpflege/c288",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 289,
+    "name": "Auto, Rad & Boot",
+    "slug": "auto-rad-boot",
+    "path": "/s-auto-rad-boot/c289",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 290,
+    "name": "Babysitter/-in & Kinderbetreuung",
+    "slug": "babysitter-kinderbetreuung",
+    "path": "/s-babysitter-kinderbetreuung/c290",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 293,
+    "name": "Elektronik",
+    "slug": "multimedia-elektronik",
+    "path": "/s-multimedia-elektronik/c293",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 291,
+    "name": "Haus & Garten",
+    "slug": "haus-garten",
+    "path": "/s-haus-garten/c291",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 292,
+    "name": "Künstler/-in & Musiker/-in",
+    "slug": "kuenstler-musiker",
+    "path": "/s-kuenstler-musiker/c292",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 294,
+    "name": "Reise & Event",
+    "slug": "reise-event",
+    "path": "/s-reise-event/c294",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 295,
+    "name": "Tierbetreuung & Training",
+    "slug": "tierbetreuung-training",
+    "path": "/s-tierbetreuung-training/c295",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 296,
+    "name": "Umzug & Transport",
+    "slug": "umzug-transport",
+    "path": "/s-umzug-transport/c296",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 298,
+    "name": "Weitere Dienstleistungen",
+    "slug": "sonstige",
+    "path": "/s-sonstige/c298",
+    "parent_id": 297,
+    "parent_name": "Dienstleistungen"
+  },
+  {
+    "category_id": 231,
+    "name": "Eintrittskarten & Tickets",
+    "slug": "eintrittskarten-tickets",
+    "path": "/s-eintrittskarten-tickets/c231",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 286,
+    "name": "Bahn & ÖPNV",
+    "slug": "bahn-oepnv",
+    "path": "/s-bahn-oepnv/c286",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 254,
+    "name": "Comedy & Kabarett",
+    "slug": "comedy-kabarett",
+    "path": "/s-comedy-kabarett/c254",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 287,
+    "name": "Gutscheine",
+    "slug": "gutscheine",
+    "path": "/s-gutscheine/c287",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 252,
+    "name": "Kinder",
+    "slug": "kinder",
+    "path": "/s-kinder/c252",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 255,
+    "name": "Konzerte",
+    "slug": "konzerte",
+    "path": "/s-konzerte/c255",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 257,
+    "name": "Sport",
+    "slug": "sport",
+    "path": "/s-sport/c257",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 251,
+    "name": "Theater & Musical",
+    "slug": "klassik-kultur",
+    "path": "/s-klassik-kultur/c251",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 256,
+    "name": "Weitere Eintrittskarten & Tickets",
+    "slug": "sonstige",
+    "path": "/s-sonstige/c256",
+    "parent_id": 231,
+    "parent_name": "Eintrittskarten & Tickets"
+  },
+  {
+    "category_id": 161,
+    "name": "Elektronik",
+    "slug": "multimedia-elektronik",
+    "path": "/s-multimedia-elektronik/c161",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 172,
+    "name": "Audio & Hifi",
+    "slug": "audio-hifi",
+    "path": "/s-audio-hifi/c172",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 226,
+    "name": "Dienstleistungen Elektronik",
+    "slug": "dienstleistungen-edv",
+    "path": "/s-dienstleistungen-edv/c226",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 245,
+    "name": "Foto",
+    "slug": "foto",
+    "path": "/s-foto/c245",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 173,
+    "name": "Handy & Telefon",
+    "slug": "handy-telekom",
+    "path": "/s-handy-telekom/c173",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 176,
+    "name": "Haushaltsgeräte",
+    "slug": "haushaltsgeraete",
+    "path": "/s-haushaltsgeraete/c176",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 279,
+    "name": "Konsolen",
+    "slug": "konsolen",
+    "path": "/s-konsolen/c279",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 278,
+    "name": "Laptops & Notebooks",
+    "slug": "notebooks",
+    "path": "/s-notebooks/c278",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 228,
+    "name": "PCs",
+    "slug": "pcs",
+    "path": "/s-pcs/c228",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 225,
+    "name": "PC-Zubehör & Software",
+    "slug": "pc-zubehoer-software",
+    "path": "/s-pc-zubehoer-software/c225",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 285,
+    "name": "Tablets & Reader",
+    "slug": "tablets-reader",
+    "path": "/s-tablets-reader/c285",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 175,
+    "name": "TV & Video",
+    "slug": "tv-video",
+    "path": "/s-tv-video/c175",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 227,
+    "name": "Videospiele",
+    "slug": "pc-videospiele",
+    "path": "/s-pc-videospiele/c227",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 405,
+    "name": "Wearables",
+    "slug": "wearables",
+    "path": "/s-wearables/c405",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 406,
+    "name": "Wearables Zubehör",
+    "slug": "wearables-zubehor",
+    "path": "/s-wearables-zubehor/c406",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 168,
+    "name": "Weitere Elektronik",
+    "slug": "multimedia-elektronik/sonstiges",
+    "path": "/s-multimedia-elektronik/sonstiges/c168",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 17,
+    "name": "Familie, Kind & Baby",
+    "slug": "familie-kind-baby",
+    "path": "/s-familie-kind-baby/c17",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 236,
+    "name": "Altenpflege",
+    "slug": "altenpflege",
+    "path": "/s-altenpflege/c236",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 22,
+    "name": "Baby- & Kinderkleidung",
+    "slug": "baby-kinderkleidung",
+    "path": "/s-baby-kinderkleidung/c22",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 19,
+    "name": "Baby- & Kinderschuhe",
+    "slug": "baby-kinderschuhe",
+    "path": "/s-baby-kinderschuhe/c19",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 258,
+    "name": "Baby-Ausstattung",
+    "slug": "babyausstattung",
+    "path": "/s-babyausstattung/c258",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 21,
+    "name": "Babyschalen & Kindersitze",
+    "slug": "babyschalen-kindersitze",
+    "path": "/s-babyschalen-kindersitze/c21",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 237,
+    "name": "Babysitter/-in & Kinderbetreuung",
+    "slug": "babysitter-kinderbetreuung",
+    "path": "/s-babysitter-kinderbetreuung/c237",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 25,
+    "name": "Kinderwagen & Buggys",
+    "slug": "kinderwagen-buggys",
+    "path": "/s-kinderwagen-buggys/c25",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 20,
+    "name": "Kinderzimmermöbel",
+    "slug": "kinderzimmermoebel",
+    "path": "/s-kinderzimmermoebel/c20",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 23,
+    "name": "Spielzeug",
+    "slug": "spielzeug",
+    "path": "/s-spielzeug/c23",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 18,
+    "name": "Weiteres Familie, Kind & Baby",
+    "slug": "familie-kind-baby/sonstiges",
+    "path": "/s-familie-kind-baby/sonstiges/c18",
+    "parent_id": 17,
+    "parent_name": "Familie, Kind & Baby"
+  },
+  {
+    "category_id": 185,
+    "name": "Freizeit, Hobby & Nachbarschaft",
+    "slug": "freizeit-nachbarschaft",
+    "path": "/s-freizeit-nachbarschaft/c185",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 232,
+    "name": "Esoterik & Spirituelles",
+    "slug": "esoterik-spirituelles",
+    "path": "/s-esoterik-spirituelles/c232",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 248,
+    "name": "Essen & Trinken",
+    "slug": "essen-trinken",
+    "path": "/s-essen-trinken/c248",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 187,
+    "name": "Freizeitaktivitäten",
+    "slug": "freizeitaktivitaeten",
+    "path": "/s-freizeitaktivitaeten/c187",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 282,
+    "name": "Handarbeit, Basteln & Kunsthandwerk",
+    "slug": "handarbeit-basteln-kunsthandwerk",
+    "path": "/s-handarbeit-basteln-kunsthandwerk/c282",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 240,
+    "name": "Kunst & Antiquitäten",
+    "slug": "kunst",
+    "path": "/s-kunst/c240",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 191,
+    "name": "Künstler/-in & Musiker/-in",
+    "slug": "kuenstler-musiker",
+    "path": "/s-kuenstler-musiker/c191",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 249,
+    "name": "Modellbau",
+    "slug": "modellbau",
+    "path": "/s-modellbau/c249",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 233,
+    "name": "Reise & Eventservices",
+    "slug": "reise-eventservices",
+    "path": "/s-reise-eventservices/c233",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 234,
+    "name": "Sammeln",
+    "slug": "sammeln",
+    "path": "/s-sammeln/c234",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 230,
+    "name": "Sport & Camping",
+    "slug": "sport-camping",
+    "path": "/s-sport-camping/c230",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 250,
+    "name": "Trödel",
+    "slug": "troedel-kistenweise",
+    "path": "/s-troedel-kistenweise/c250",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 189,
+    "name": "Verloren & Gefunden",
+    "slug": "verloren-gefunden",
+    "path": "/s-verloren-gefunden/c189",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 242,
+    "name": "Weiteres Freizeit, Hobby & Nachbarschaft",
+    "slug": "freizeit-nachbarschaft/sonstiges",
+    "path": "/s-freizeit-nachbarschaft/sonstiges/c242",
+    "parent_id": 185,
+    "parent_name": "Freizeit, Hobby & Nachbarschaft"
+  },
+  {
+    "category_id": 80,
+    "name": "Haus & Garten",
+    "slug": "haus-garten",
+    "path": "/s-haus-garten/c80",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 91,
+    "name": "Badezimmer",
+    "slug": "badezimmer",
+    "path": "/s-badezimmer/c91",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 93,
+    "name": "Büro",
+    "slug": "bueromoebel",
+    "path": "/s-bueromoebel/c93",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 246,
+    "name": "Dekoration",
+    "slug": "dekoration",
+    "path": "/s-dekoration/c246",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 239,
+    "name": "Dienstleistungen Haus & Garten",
+    "slug": "dienstleistungen-haus-garten",
+    "path": "/s-dienstleistungen-haus-garten/c239",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 89,
+    "name": "Gartenzubehör & Pflanzen",
+    "slug": "garten-pflanzen",
+    "path": "/s-garten-pflanzen/c89",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 90,
+    "name": "Heimtextilien",
+    "slug": "heimtextilien",
+    "path": "/s-heimtextilien/c90",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 84,
+    "name": "Heimwerken",
+    "slug": "heimwerken",
+    "path": "/s-heimwerken/c84",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 86,
+    "name": "Küche & Esszimmer",
+    "slug": "kueche-esszimmer",
+    "path": "/s-kueche-esszimmer/c86",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 82,
+    "name": "Lampen & Licht",
+    "slug": "lampen-licht",
+    "path": "/s-lampen-licht/c82",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 81,
+    "name": "Schlafzimmer",
+    "slug": "schlafzimmer",
+    "path": "/s-schlafzimmer/c81",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 88,
+    "name": "Wohnzimmer",
+    "slug": "wohnzimmer",
+    "path": "/s-wohnzimmer/c88",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 87,
+    "name": "Weiteres Haus & Garten",
+    "slug": "haus-garten/sonstiges",
+    "path": "/s-haus-garten/sonstiges/c87",
+    "parent_id": 80,
+    "parent_name": "Haus & Garten"
+  },
+  {
+    "category_id": 130,
+    "name": "Haustiere",
+    "slug": "haustiere",
+    "path": "/s-haustiere/c130",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 138,
+    "name": "Fische",
+    "slug": "fische",
+    "path": "/s-fische/c138",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 134,
+    "name": "Hunde",
+    "slug": "hunde",
+    "path": "/s-hunde/c134",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 136,
+    "name": "Katzen",
+    "slug": "katzen",
+    "path": "/s-katzen/c136",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 132,
+    "name": "Kleintiere",
+    "slug": "kleintiere",
+    "path": "/s-kleintiere/c132",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 135,
+    "name": "Nutztiere",
+    "slug": "nutztiere",
+    "path": "/s-nutztiere/c135",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 139,
+    "name": "Pferde",
+    "slug": "pferde",
+    "path": "/s-pferde/c139",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 133,
+    "name": "Tierbetreuung & Training",
+    "slug": "tierbetreuung-training",
+    "path": "/s-tierbetreuung-training/c133",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 283,
+    "name": "Vermisste Tiere",
+    "slug": "vermisste-tiere",
+    "path": "/s-vermisste-tiere/c283",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 243,
+    "name": "Vögel",
+    "slug": "vogel",
+    "path": "/s-vogel/c243",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 313,
+    "name": "Zubehör",
+    "slug": "zubehoer",
+    "path": "/s-zubehoer/c313",
+    "parent_id": 130,
+    "parent_name": "Haustiere"
+  },
+  {
+    "category_id": 195,
+    "name": "Immobilien",
+    "slug": "immobilien",
+    "path": "/s-immobilien/c195",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 199,
+    "name": "Auf Zeit & WG",
+    "slug": "auf-zeit-wg",
+    "path": "/s-auf-zeit-wg/c199",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 402,
+    "name": "Container",
+    "slug": "container",
+    "path": "/s-container/c402",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 196,
+    "name": "Eigentumswohnungen",
+    "slug": "wohnung-kaufen",
+    "path": "/s-wohnung-kaufen/c196",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 275,
+    "name": "Ferien- & Auslandsimmobilien",
+    "slug": "ferienwohnung-ferienhaus",
+    "path": "/s-ferienwohnung-ferienhaus/c275",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 197,
+    "name": "Garagen & Stellplätze",
+    "slug": "garage-lagerraum",
+    "path": "/s-garage-lagerraum/c197",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 277,
+    "name": "Gewerbeimmobilien",
+    "slug": "gewerbeimmobilien",
+    "path": "/s-gewerbeimmobilien/c277",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 207,
+    "name": "Grundstücke & Gärten",
+    "slug": "grundstuecke-garten",
+    "path": "/s-grundstuecke-garten/c207",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 208,
+    "name": "Häuser zum Kauf",
+    "slug": "haus-kaufen",
+    "path": "/s-haus-kaufen/c208",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 205,
+    "name": "Häuser zur Miete",
+    "slug": "haus-mieten",
+    "path": "/s-haus-mieten/c205",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 203,
+    "name": "Mietwohnungen",
+    "slug": "wohnung-mieten",
+    "path": "/s-wohnung-mieten/c203",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 403,
+    "name": "Neubauprojekte",
+    "slug": "neubauprojekte",
+    "path": "/s-neubauprojekte/c403",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 238,
+    "name": "Umzug & Transport",
+    "slug": "umzug-transport",
+    "path": "/s-umzug-transport/c238",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 198,
+    "name": "Weitere Immobilien",
+    "slug": "immobilien/sonstiges",
+    "path": "/s-immobilien/sonstiges/c198",
+    "parent_id": 195,
+    "parent_name": "Immobilien"
+  },
+  {
+    "category_id": 102,
+    "name": "Jobs",
+    "slug": "jobs",
+    "path": "/s-jobs/c102",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 118,
+    "name": "Ausbildung",
+    "slug": "ausbildung",
+    "path": "/s-ausbildung/c118",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 111,
+    "name": "Bau, Handwerk & Produktion",
+    "slug": "bau-handwerk-produktion",
+    "path": "/s-bau-handwerk-produktion/c111",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 114,
+    "name": "Büroarbeit & Verwaltung",
+    "slug": "bueroarbeit-verwaltung",
+    "path": "/s-bueroarbeit-verwaltung/c114",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 110,
+    "name": "Gastronomie & Tourismus",
+    "slug": "gastronomie-tourismus",
+    "path": "/s-gastronomie-tourismus/c110",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 105,
+    "name": "Kundenservice & Call Center",
+    "slug": "kundenservice-callcenter",
+    "path": "/s-kundenservice-callcenter/c105",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 107,
+    "name": "Mini- & Nebenjobs",
+    "slug": "heimarbeit-mini-nebenjobs",
+    "path": "/s-heimarbeit-mini-nebenjobs/c107",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 125,
+    "name": "Praktika",
+    "slug": "praktika",
+    "path": "/s-praktika/c125",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 123,
+    "name": "Sozialer Sektor & Pflege",
+    "slug": "sozialer-sektor-pflege",
+    "path": "/s-sozialer-sektor-pflege/c123",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 247,
+    "name": "Transport, Logistik & Verkehr",
+    "slug": "transport-logistik-verkehr",
+    "path": "/s-transport-logistik-verkehr/c247",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 117,
+    "name": "Vertrieb, Einkauf & Verkauf",
+    "slug": "vertrieb-einkauf-verkauf",
+    "path": "/s-vertrieb-einkauf-verkauf/c117",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 109,
+    "name": "Weitere Jobs",
+    "slug": "sonstige-berufe",
+    "path": "/s-sonstige-berufe/c109",
+    "parent_id": 102,
+    "parent_name": "Jobs"
+  },
+  {
+    "category_id": 153,
+    "name": "Mode & Beauty",
+    "slug": "mode-beauty",
+    "path": "/s-mode-beauty/c153",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 224,
+    "name": "Beauty & Gesundheit",
+    "slug": "beauty-gesundheit",
+    "path": "/s-beauty-gesundheit/c224",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 154,
+    "name": "Damenbekleidung",
+    "slug": "kleidung-damen",
+    "path": "/s-kleidung-damen/c154",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 159,
+    "name": "Damenschuhe",
+    "slug": "schuhe-damen",
+    "path": "/s-schuhe-damen/c159",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 160,
+    "name": "Herrenbekleidung",
+    "slug": "kleidung-herren",
+    "path": "/s-kleidung-herren/c160",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 158,
+    "name": "Herrenschuhe",
+    "slug": "schuhe-herren",
+    "path": "/s-schuhe-herren/c158",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 156,
+    "name": "Taschen & Accessoires",
+    "slug": "accessoires-schmuck",
+    "path": "/s-accessoires-schmuck/c156",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 157,
+    "name": "Uhren & Schmuck",
+    "slug": "uhren-schmuck",
+    "path": "/s-uhren-schmuck/c157",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 155,
+    "name": "Weiteres Mode & Beauty",
+    "slug": "mode-beauty/sonstiges",
+    "path": "/s-mode-beauty/sonstiges/c155",
+    "parent_id": 153,
+    "parent_name": "Mode & Beauty"
+  },
+  {
+    "category_id": 73,
+    "name": "Musik, Filme & Bücher",
+    "slug": "musik-film-buecher",
+    "path": "/s-musik-film-buecher/c73",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 76,
+    "name": "Bücher & Zeitschriften",
+    "slug": "buecher-zeitschriften",
+    "path": "/s-buecher-zeitschriften/c76",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 281,
+    "name": "Büro & Schreibwaren",
+    "slug": "buero-schreibwaren",
+    "path": "/s-buero-schreibwaren/c281",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 284,
+    "name": "Comics",
+    "slug": "comics",
+    "path": "/s-comics/c284",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 77,
+    "name": "Fachbücher, Schule & Studium",
+    "slug": "fachbuecher-schule-studium",
+    "path": "/s-fachbuecher-schule-studium/c77",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 79,
+    "name": "Film & DVD",
+    "slug": "film-dvd",
+    "path": "/s-film-dvd/c79",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 78,
+    "name": "Musik & CDs",
+    "slug": "musik-cds",
+    "path": "/s-musik-cds/c78",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 74,
+    "name": "Musikinstrumente",
+    "slug": "musikinstrumente",
+    "path": "/s-musikinstrumente/c74",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 75,
+    "name": "Weitere Musik, Filme & Bücher",
+    "slug": "musik-film-buecher/sonstiges",
+    "path": "/s-musik-film-buecher/sonstiges/c75",
+    "parent_id": 73,
+    "parent_name": "Musik, Filme & Bücher"
+  },
+  {
+    "category_id": 400,
+    "name": "Nachbarschaftshilfe",
+    "slug": "nachbarschaftshilfe",
+    "path": "/s-nachbarschaftshilfe/c400",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 401,
+    "name": "Nachbarschaftshilfe",
+    "slug": "nachbarschaftshilfe",
+    "path": "/s-nachbarschaftshilfe/c401",
+    "parent_id": 400,
+    "parent_name": "Nachbarschaftshilfe"
+  },
+  {
+    "category_id": 235,
+    "name": "Unterricht & Kurse",
+    "slug": "unterricht-kurse",
+    "path": "/s-unterricht-kurse/c235",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 269,
+    "name": "Beauty & Gesundheit",
+    "slug": "beauty-gesundheit",
+    "path": "/s-beauty-gesundheit/c269",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 260,
+    "name": "Computerkurse",
+    "slug": "computerkurse",
+    "path": "/s-computerkurse/c260",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 265,
+    "name": "Esoterik & Spirituelles",
+    "slug": "esoterik-spirituelles",
+    "path": "/s-esoterik-spirituelles/c265",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 263,
+    "name": "Kochen & Backen",
+    "slug": "kochen-backen",
+    "path": "/s-kochen-backen/c263",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 264,
+    "name": "Kunst & Gestaltung",
+    "slug": "kunst-gestaltung",
+    "path": "/s-kunst-gestaltung/c264",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 262,
+    "name": "Musik & Gesang",
+    "slug": "musik-gesang",
+    "path": "/s-musik-gesang/c262",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 268,
+    "name": "Nachhilfe",
+    "slug": "nachhilfe",
+    "path": "/s-nachhilfe/c268",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 261,
+    "name": "Sportkurse",
+    "slug": "sportkurse",
+    "path": "/s-sportkurse/c261",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 271,
+    "name": "Sprachkurse",
+    "slug": "sprachkurse",
+    "path": "/s-sprachkurse/c271",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 267,
+    "name": "Tanzkurse",
+    "slug": "tanzkurse",
+    "path": "/s-tanzkurse/c267",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 266,
+    "name": "Weiterbildung",
+    "slug": "weiterbildung",
+    "path": "/s-weiterbildung/c266",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 270,
+    "name": "Weitere Unterricht & Kurse",
+    "slug": "sonstige",
+    "path": "/s-sonstige/c270",
+    "parent_id": 235,
+    "parent_name": "Unterricht & Kurse"
+  },
+  {
+    "category_id": 272,
+    "name": "Verschenken & Tauschen",
+    "slug": "zu-verschenken-tauschen",
+    "path": "/s-zu-verschenken-tauschen/c272",
+    "parent_id": null,
+    "parent_name": null
+  },
+  {
+    "category_id": 273,
+    "name": "Tauschen",
+    "slug": "tauschen",
+    "path": "/s-tauschen/c273",
+    "parent_id": 272,
+    "parent_name": "Verschenken & Tauschen"
+  },
+  {
+    "category_id": 274,
+    "name": "Verleihen",
+    "slug": "verleihen",
+    "path": "/s-verleihen/c274",
+    "parent_id": 272,
+    "parent_name": "Verschenken & Tauschen"
+  },
+  {
+    "category_id": 192,
+    "name": "Verschenken",
+    "slug": "zu-verschenken",
+    "path": "/s-zu-verschenken/c192",
+    "parent_id": 272,
+    "parent_name": "Verschenken & Tauschen"
+  }
+]
