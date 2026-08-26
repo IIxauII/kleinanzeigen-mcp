@@ -198,6 +198,26 @@ describe("what the drift check exits with", () => {
   it("is 2 when the check could not run, which is not the same as clean", () => {
     expect(driftExitCode({ outcome: "unavailable", reason: "block", message: "blocked" })).toBe(2);
   });
+
+  it("is 2 for a clean answer that came from the cache, not from the site", () => {
+    // The exit code is the machine-readable answer, and 0 would claim the
+    // bundle is current *now* on the strength of an earlier moment's bytes.
+    expect(driftExitCode({ outcome: "clean", bundled_count: 159, live_count: 159, stale: true })) //
+      .toBe(2);
+  });
+
+  it("is still 1 for drift found in cached bytes, because that drift was real", () => {
+    expect(
+      driftExitCode({
+        outcome: "drifted",
+        bundled_count: 159,
+        live_count: 160,
+        stale: true,
+        added: [999],
+        removed: [],
+      }),
+    ).toBe(1);
+  });
 });
 
 describe("what the drift check is not wired into", () => {
