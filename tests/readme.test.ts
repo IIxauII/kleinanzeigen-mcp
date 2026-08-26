@@ -116,10 +116,12 @@ describe("the README's known limits", () => {
 describe("the README's terms-of-service position", () => {
   const TOS = "12. The ToS position";
 
+  // Every opening must resolve against SPEC 12. There is no skip: this is the
+  // one test that would stop enforcing "verbatim" if §12 were reworded, so an
+  // opening that matches nothing has to fail rather than be passed over.
   it("carries SPEC 12's claims verbatim, including the contradiction it does not resolve", () => {
     for (const opening of [
       "**There is a genuine contradiction",
-      "**§ 5 Nr. 1 der Nutzungsbedingungen",
       "**§ 5 Nr. 1 of the Nutzungsbedingungen**",
       "**`robots.txt` says something different.**",
       "**Choosing robots-clean does not resolve",
@@ -130,13 +132,7 @@ describe("the README's terms-of-service position", () => {
       "- **It is single-user and local.**",
       "**What this is not.**",
     ]) {
-      let line: string;
-      try {
-        line = specLine(TOS, opening);
-      } catch {
-        continue; // an opening the spec does not use; another spelling above covers it
-      }
-      expect(readme, opening).toContain(line);
+      expect(readme, opening).toContain(specLine(TOS, opening));
     }
   });
 
@@ -148,7 +144,7 @@ describe("the README's terms-of-service position", () => {
 describe("the README on what is left open", () => {
   it("says the licence and publishing are open on purpose, and decides neither", () => {
     expect(readme).toContain("**Both are deliberately left open.**");
-    expect(readme).toContain("all-rights-reserved");
+    expect(readme).toContain("Until a licence is chosen there is no licence file");
     expect(readme).toContain("one line of this README and nothing in the code");
   });
 });
