@@ -30,6 +30,7 @@
 import * as cheerio from "cheerio";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { DIRECTORY_PAGE_SIZE, directoryRequest } from "../src/shop/directory-request.ts";
 import { islandName } from "../src/shop/island-props.ts";
 import { shopAdsRequest, shopPageUrl, SHOP_PAGE_SIZE } from "../src/shop/shop-request.ts";
 import { raw, rawPost } from "./capture-raw.ts";
@@ -60,6 +61,16 @@ const RPC_PAGES = [
   // Page 3 of the same shop: past the end, and **a clean termination rather
   // than an error** — `ads: []` in 444 bytes (SPEC 5.2).
   { name: "shop-ads-empty", slug: "decathlon-muenster", page: 3 },
+] as const;
+
+const DIRECTORY_PAGES = [
+  // A full page of candidates for a name that collides at scale: `totalHits`
+  // runs into the hundreds while the page carries 50, which is the fixture
+  // that proves `count` is the **whole match set** and not this page.
+  { name: "shop-directory", query: { name: "autohaus" } },
+  // Zero matches, which the directory answers with an honest HTTP 200 and
+  // `totalHits: 0` — a normal result, never an error (SPEC 6.3).
+  { name: "shop-directory-empty", query: { name: "kein-unternehmen-mit-diesem-namen-xyz123" } },
 ] as const;
 
 type Redact = ReturnType<typeof redactor>;
@@ -247,6 +258,43 @@ function minimiseShopAds(body: string, name: string): string {
   return `${JSON.stringify(values)}\n`;
 }
 
+/**
+ * The directory payload, redacted **at its indices** — the same index table the
+ * inventory RPC answers in, holding a different record.
+ *
+ * `liveAds` and `totalHits` are left alone: they are counts, they carry nobody,
+ * and they are the two numbers the fixtures exist to pin.
+ */
+function minimiseDirectory(body: string, name: string): string {
+  const values = JSON.parse(body) as unknown[];
+  const redact = redactor();
+  const rewritten = new Set<number>();
+  const root = values[0] as Record<string, number>;
+  const cardsSlot = root["brandingCards"];
+  if (cardsSlot === undefined) throw new Error(`${name}: the payload names no brandingCards`);
+  const cards = values[cardsSlot] as number[];
+
+  const set = (card: Record<string, number>, key: string, held: unknown): void => {
+    const slot = card[key];
+    if (slot === undefined || rewritten.has(slot)) return;
+    values[slot] = held;
+    rewritten.add(slot);
+  };
+
+  for (const [index, reference] of cards.entries()) {
+    const card = values[reference] as Record<string, number>;
+    set(card, "title", redact.shopName(index));
+    set(card, "location", redact.place(String(values[card["location"]!])));
+    // The `/pro/` prefix stays: it is the shape the parser strips, and a
+    // fixture without it would not exercise the strip.
+    set(card, "urlExtension", `/pro/${redact.shopSlug(index)}`);
+    set(card, "userId", redact.userId(index));
+    set(card, "logoUrl", `${redact.image(900 + index)}?rule=$_0.JPG`);
+  }
+  if (cards.length === 0 && !name.endsWith("empty")) throw new Error(`${name}: no candidates to redact`);
+  return `${JSON.stringify(values)}\n`;
+}
+
 const refetch = process.argv.includes("--refetch");
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -261,5 +309,13 @@ for (const { name, slug, page } of RPC_PAGES) {
   if (request.body["pageSize"] !== SHOP_PAGE_SIZE) throw new Error("the capture must page as the server does");
   const body = await rawPost(name, request.url, request.body, refetch);
   writeFileSync(`${OUT_DIR}${name}.json`, minimiseShopAds(body, name), "utf8");
+  process.stderr.write(`wrote ${name}.json\n`);
+}
+
+for (const { name, query } of DIRECTORY_PAGES) {
+  const request = directoryRequest(query);
+  if (request.body["pageSize"] !== DIRECTORY_PAGE_SIZE) throw new Error("the capture must page as the server does");
+  const body = await rawPost(name, request.url, request.body, refetch);
+  writeFileSync(`${OUT_DIR}${name}.json`, minimiseDirectory(body, name), "utf8");
   process.stderr.write(`wrote ${name}.json\n`);
 }
