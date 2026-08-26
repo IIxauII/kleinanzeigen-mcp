@@ -21,9 +21,16 @@ export type CategoryIdDiff = {
  * read" is a third outcome, and reading it as "clean" would report a healthy
  * bundle for a check that never happened.
  */
+type Counts = {
+  bundled_count: number;
+  live_count: number;
+  /** Whether the live side came from the cache after a failure, not from the site. */
+  stale: boolean;
+};
+
 export type CategoryDriftReport =
-  | { outcome: "clean"; bundled_count: number; live_count: number }
-  | ({ outcome: "drifted"; bundled_count: number; live_count: number } & CategoryIdDiff)
+  | ({ outcome: "clean" } & Counts)
+  | ({ outcome: "drifted" } & Counts & CategoryIdDiff)
   | { outcome: "unavailable"; reason: FailureReason; message: string };
 
 const ascending = (left: number, right: number): number => left - right;
@@ -50,8 +57,8 @@ export type CategoryDriftOptions = {
  * It **reads and reports and writes nothing** — drift is fixed by shipping a
  * new version, not by a runtime write (ADR-0002). It is explicitly invoked and
  * opportunistic: nothing on the request path calls it, so it never runs on a
- * tool call. And it is **not conditioned on the sitemap index's `lastmod`**,
- * which marks a whole-index regeneration rather than a taxonomy change.
+ * tool call. Nothing here is conditioned on the sitemap index's `lastmod`,
+ * for the reason `parseCategorySitemap` gives.
  *
  * A sitemap that cannot be read is reported, never thrown: a maintenance check
  * that fails because the site is down has learnt nothing, which is not the same
@@ -64,11 +71,16 @@ export async function checkCategoryDrift({
   const bundled = readCategoryTree().map((node) => node.category_id);
 
   let live: number[];
+  let stale = false;
   try {
-    const { data } = await core.fetch(CATEGORIES_SITEMAP_URL, (body) =>
+    const { data, envelope } = await core.fetch(CATEGORIES_SITEMAP_URL, (body) =>
       parseCategorySitemap(body).map((entry) => entry.category_id),
     );
     live = data;
+    // A stale serve diffed cached bytes rather than the site as it is now, and
+    // "clean" would be a claim about the wrong moment. Unreachable from the
+    // one-shot CLI, whose cache is empty — but the function is exported.
+    stale = envelope.stale;
   } catch (error) {
     const failure =
       error instanceof FetchError
@@ -83,7 +95,7 @@ export async function checkCategoryDrift({
     return { outcome: "unavailable", reason: failure.reason, message: failure.message };
   }
 
-  const counts = { bundled_count: bundled.length, live_count: live.length };
+  const counts = { bundled_count: bundled.length, live_count: live.length, stale };
   const { added, removed } = diffCategoryIds(bundled, live);
 
   if (added.length === 0 && removed.length === 0) {
@@ -93,4 +105,20 @@ export async function checkCategoryDrift({
 
   log("category_drift", { level: "warn", ...counts, added, removed, rebuild: REBUILD_COMMAND });
   return { outcome: "drifted", ...counts, added, removed };
+}
+
+/**
+ * What the process exits with after a check: 0 clean, 1 drifted, 2 could not be
+ * checked. The third is deliberately not 0 — a check that never reached the
+ * sitemap has not established that the bundle is current (SPEC 7).
+ */
+export function driftExitCode(report: CategoryDriftReport): number {
+  switch (report.outcome) {
+    case "clean":
+      return 0;
+    case "drifted":
+      return 1;
+    case "unavailable":
+      return 2;
+  }
 }
