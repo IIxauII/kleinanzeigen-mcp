@@ -138,7 +138,7 @@ It is also **not conditioned on the sitemap index's `lastmod`**. That timestamp 
 
 These are things you will hit. None of them is a bug.
 
-1. **1 250 organic listings per query, maximum.** Against category totals near a million. On a broad query you are seeing a *window*, and the right response is to narrow — which is why `total` and `reachable` are reported separately. The ceiling costs nothing on the long tail, which is where assistant-driven search actually lives.
+1. **1 250 organic listings per query, maximum.** Against category totals near a million. On a broad query you are seeing a *window*, and the right response is to narrow — which is why `total` and `reachable` are reported separately. The ceiling costs **nothing on the long tail**, which is where assistant-driven search actually lives: `stefan zweig erstausgabe` in Books returns `1 - 2 von 2` — complete recall.
 2. **Page 51 and beyond silently re-serve page 50.** Detected and reported as `clamped: true`, never as data.
 3. **High-volume queries drift between pages.** About 4% duplicates over a 13-second sweep, worse over a lazy walk. Every duplicate is also a listing missed. **Dedupe on `ad_id`** and count distinct ids — never pages × 25.
 4. **No sort by distance.** Disallowed in every spelling, with no query-string equivalent.
@@ -149,11 +149,11 @@ These are things you will hit. None of them is a bug.
 9. **A postcode is not an identifier.** `10115` is two disjoint locations; the site's free-text resolution picks one silently, and `location_resolution` in the search envelope is the only reason a caller can tell.
 10. **The DOM is the contract, and it is not ours.** The anchors have been stable across five scrapers and five years, but a redesign breaks the parser. A loud `parse_failure` line on stderr is the tripwire.
 11. **Three site-side label bugs are live today**, and more may exist. The mitigation is structural: read numbers, never labels.
-12. **The `shippingCarrier` enum could widen without warning.** It is a server-side closed set, so a new carrier arrives as a 400 on a value we never send — invisible rather than breaking.
+12. **The `shippingCarrier` enum could widen without warning.** It is a server-side closed set, so a new carrier arrives as a 400 on a value we never send — invisible rather than breaking. The cheap standing check is the `Paketdienst` facet group on `/s-k0`, one allowed request.
 13. **Umlaut folding in `find_shop` is uncharacterised.** `köln` returns 492 hits, `koln` returns 3. Your string is passed through untouched.
-14. **Shop inventory totals do not reconcile.** One shop reports `18 Anzeigen online` on its page, 17 rows through the inventory RPC, and `71 Anzeigen gesamt` separately — three counts with no known authority. `ads_online` is reported as the site states it and is never promised to equal the listings actually returned.
-15. **How deep the shop RPC goes before clamping is unprobed.** The largest shop sampled had 170 listings, so no analogue of the page-50 wall has been ruled out.
-16. **No radius-free rural fallback beyond what the site gives.** `radius` covers this properly, but kleinanzeigen's own catchment is administrative containment.
+14. **Shop inventory totals do not reconcile.** One shop reports `18 Anzeigen online` on its page, 17 rows through the inventory RPC, and `71 Anzeigen gesamt` separately — three counts with no known authority. A **fourth** figure turned up while building `get_shop`: the shop directory's `liveAds` read `11` for a shop whose own `adsOnline` read `10` minutes later. One listing expiring in between would explain it, so it is recorded rather than claimed. `ads_online` is reported as the site states it and is never promised to equal the listings actually returned.
+15. **How deep the shop RPC goes before clamping is unprobed.** `pageSize` is honoured to at least 100 and paging terminates cleanly past the end — but the largest shop sampled had 170 listings, so no analogue of the page-50 wall has been ruled out.
+16. **No radius-free rural fallback beyond what the site gives.** `radius` covers this properly, but kleinanzeigen's own catchment is administrative containment: only 5 `Kr.` nodes exist in Bayern's 2 079 children.
 
 ---
 
@@ -187,7 +187,7 @@ What the project does about it:
 
 **Both are deliberately left open.** No licence has been chosen and nothing is published to npm. They ride together, and neither blocks building or running this.
 
-The package is publish-ready by construction all the same — it carries a `bin` entry, no `postinstall` and no native dependencies — so deciding to publish would change one line of this README and nothing in the code. Until then, treat the code as all-rights-reserved.
+The package is publish-ready by construction all the same — it carries a `bin` entry, no `postinstall` and no native dependencies — so deciding to publish would change one line of this README and nothing in the code. Until a licence is chosen there is no licence file, and copyright's own defaults are the only thing in force.
 
 ---
 
