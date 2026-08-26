@@ -83,6 +83,10 @@ The two levels of the taxonomy. There is no third.
 **Category tree** _(Kategoriebaum)_:
 The complete taxonomy, 159 nodes.
 
+**Category drift** _(Kategoriedrift)_:
+The bundled *category tree* falling out of step with the site's own taxonomy: a node added or removed since the dataset was generated. Distinct from *Drift*, which slides underneath a single caller's walk — this moves between releases, not between requests. Found by the **drift check**, an explicitly-invoked read of the categories sitemap that diffs id sets and **writes nothing**: it is fixed by regenerating the dataset and shipping a new version, never by a runtime write ([ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md)).
+_Avoid_: Stale tree, taxonomy churn
+
 **Attribute** _(Attribut, Merkmal)_:
 A category-specific typed field on a listing, keyed `<namespace>.<field>_<type>`, e.g. `autos.km_i`.
 
@@ -221,7 +225,7 @@ How results are ordered. Newest first is the default.
 One page of a search results page's pagination: 25 organic listings.
 
 **Drift**:
-The result set sliding underneath a caller-driven walk. New listings land, the date window moves, and the same listing is served on two pages while another is never served at all — 5 of 125 organic rows were duplicates over a 13-second sweep. It is a property of the source rather than of the walk, so **dedupe is the caller's**: dedupe on ad id and report the *distinct* count, never pages × 25. A server-side dedupe would need the query-scoped state [ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md) forbids.
+The result set sliding underneath a caller-driven walk. New listings land, the date window moves, and the same listing is served on two pages while another is never served at all — 5 of 125 organic rows were duplicates over a 13-second sweep. It is a property of the source rather than of the walk, so **dedupe is the caller's**: dedupe on ad id and report the *distinct* count, never pages × 25. A server-side dedupe would need the query-scoped state [ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md) forbids. Unqualified, **Drift** always means this one; the taxonomy's is *Category drift*.
 _Avoid_: Churn, jitter, pagination bug
 
 **Shipping offered** _(Versand möglich)_:
