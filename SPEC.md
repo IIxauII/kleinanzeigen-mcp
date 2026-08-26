@@ -561,6 +561,10 @@ Envelope & {
 
 Never auto-selected, even at `count: 1` — **and here that rule is a correctness guard, not a homonym guard.** `fulltext` matches **profile prose, not just names**: `"decathlon"` returns `TGW Systems Integration GmbH`, whose `about` text merely names Decathlon as a customer, and `searchScope: "BRANDING"` does not exclude it. **A single exact hit can still be the wrong shop.**
 
+> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** "Validated against the bundled trees" holds for **`category_id` and not for `location_id`**, and the difference is the datasets rather than the ids. The filter ids *are* the same numeric ids — the same id **space** — but the two bundled sets are not the same shape of complete. The category tree is complete: 159 of 159 nodes, byte-identical to the disallowed tree (§7). The city dataset knowingly is not: it holds the location tree's first two tiers, and **sub-Ortsteile (Wedding `l3503`) and the entire postcode layer are absent from every allowed source** (§7's correction).
+>
+> So refusing `l3503` would reject an id the directory filters by and answers **honestly** — the opposite of the failure the check exists to prevent — and a caller can hold such an id legitimately, since the third number in a listing URL is a location id (§2.2). The category id is checked; the location id is passed through to the site, which is the authority for it.
+
 **Pass the caller's string through; never transliterate.** Umlaut folding is uncharacterised — `köln` → 492 hits, `koln` → 3, and those 3 include a shop whose name *has* the umlaut.
 
 **`pageSize` > 50 returns HTTP 204 with a zero-byte body.** The server never sends one, but 204 must be treated as an **error**, never as zero results.
@@ -916,6 +920,12 @@ Never settled explicitly. [#4](https://github.com/IIxauII/kleinanzeigen-mcp/issu
 - `?radius=` with no location has nothing to be a radius *of*. Sending it produces a nationwide result the caller believes was scoped.
 
 Neither yields an honest empty set; both yield a plausible wrong answer. That is the seam.
+
+> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** Two more refinements ship, and both sit on the same seam rather than beside it.
+>
+> **§4.5's `category_id` is checked against the bundled tree**, and an id it does not have is refused before a request is spent on it. The site would not `400` such an id — it takes it, filters by it, and answers. That is precisely the problem: the answer is an empty set the caller reads as *no shops in that category*, when what happened is that there is no such category. Plausible wrong answer, not honest empty set. The check costs nothing — no request, and the tree is not read at all unless a category id was given (§7) — and `search_listings` deliberately does not make it, because there the ids ride a URL path code the site resolves for itself while here the id goes to a filter field. **`location_id` gets no such check**; §4.5's correction says why.
+>
+> **An empty `name` is refused.** The action treats `fulltext` as *optional* and answers an omitted one with the whole 53 808-shop directory rather than with a `400` — which is the browse surface §1 puts out of scope, and is not what a caller asking for a shop by name meant. Honest empty set, no; plausible wrong answer at 53 808 rows, yes.
 
 ### 11.5 Field naming is `snake_case`, values keep the site's spelling
 

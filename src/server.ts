@@ -3,6 +3,7 @@ import { loadCategoryTree, type CategoryTree } from "./categories/category-tree.
 import { loadCityDataset, type CityDataset } from "./locations/city-dataset.ts";
 import { registerFindCategory } from "./tools/find-category.ts";
 import { registerFindLocation } from "./tools/find-location.ts";
+import { registerFindShop } from "./tools/find-shop.ts";
 import { registerGetListing } from "./tools/get-listing.ts";
 import { registerGetShop } from "./tools/get-shop.ts";
 import { registerSearchListings } from "./tools/search-listings.ts";
@@ -34,5 +35,6 @@ export function createServer({
   registerGetShop(server);
   registerFindCategory(server, readCategoryTree);
   registerFindLocation(server, readCityDataset);
+  registerFindShop(server, readCategoryTree);
   return server;
 }

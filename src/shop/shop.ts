@@ -76,3 +76,36 @@ export const ShopRowSchema = z.object({
 });
 
 export type ShopRow = z.infer<typeof ShopRowSchema>;
+
+/**
+ * One candidate off the shop directory — **a candidate, never a selection**
+ * (SPEC 4.5).
+ *
+ * It is a thinner thing than a `Shop` on purpose: the directory carries six
+ * fields per hit and the profile carries more, and a candidate that looked like
+ * a `Shop` would invite a caller to use it as one. What it has is what is
+ * needed to *choose*: the name to read, the slug to hand to `get_shop`, the
+ * seller id to pin the identity, the location and the inventory size to tell
+ * seven branches of one chain apart.
+ *
+ * **`shop_slug` is the site's spelling with the `/pro/` prefix taken off, and
+ * nothing else.** Case is load-bearing nowhere and the numeric collision suffix
+ * is load-bearing everywhere, so the whole handle is round-tripped untouched
+ * (SPEC 3.5).
+ *
+ * **`ads_online` is the directory's `liveAds`**, which is a *fourth* shop count
+ * beside the three that already do not reconcile — the directory read `11` for
+ * a shop whose own page read `10` minutes later. It is reported as the
+ * directory states it and promised to be nothing else (SPEC 9.14).
+ */
+export const ShopCandidateSchema = z.object({
+  name: z.string(),
+  shop_slug: z.string(),
+  seller_id: z.number().int().positive(),
+  /** `Köln Weiden` — free text the directory renders, and **never** a location id. */
+  location: z.string().nullable(),
+  ads_online: z.number().int().nonnegative(),
+  logo_url: z.string().nullable(),
+});
+
+export type ShopCandidate = z.infer<typeof ShopCandidateSchema>;
