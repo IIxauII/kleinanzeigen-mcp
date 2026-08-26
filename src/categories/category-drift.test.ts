@@ -1,10 +1,12 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Cache } from "../fetch/cache.ts";
 import { createFetchCore, type FetchImpl } from "../fetch/core.ts";
 import { CATEGORIES_SITEMAP_URL } from "./category-sitemap.ts";
 import {
   checkCategoryDrift,
   diffCategoryIds,
+  driftExitCode,
   REBUILD_COMMAND,
   type CategoryDriftReport,
 } from "./category-drift.ts";
@@ -88,7 +90,7 @@ describe("the category drift check", () => {
 
   it("reports a clean bundle when the id sets agree", async () => {
     const { report } = harness();
-    expect(await report()).toEqual({ outcome: "clean", bundled_count: 7, live_count: 7 });
+    expect(await report()).toEqual({ outcome: "clean", bundled_count: 7, live_count: 7, stale: false });
   });
 
   it("names the added and removed ids when the taxonomy has moved", async () => {
@@ -97,6 +99,7 @@ describe("the category drift check", () => {
       outcome: "drifted",
       bundled_count: 7,
       live_count: 7,
+      stale: false,
       added: [273],
       removed: [4242],
     });
@@ -137,23 +140,89 @@ describe("the category drift check", () => {
       .toContain("category_drift_unavailable");
   });
 
+  it("says the answer was stale when a failure fell back to a cached sitemap", async () => {
+    // Nothing was fresh, so the second call reaches the site, fails, and falls
+    // back — the same path SPEC 6.2 puts every tool on. "clean" against cached
+    // bytes is a claim about the wrong moment, so the report says which.
+    const entries = new Map<string, { value: unknown; fetched_at: string }>();
+    const cache: Cache<unknown> = {
+      get: (key) => {
+        const entry = entries.get(key);
+        return entry === undefined ? null : { ...entry, fresh: false };
+      },
+      set: (key, value) => {
+        const entry = { value, fetched_at: "2026-08-26T00:00:00.000Z" };
+        entries.set(key, entry);
+        return { ...entry, fresh: true };
+      },
+      size: () => entries.size,
+    };
+
+    let failing = false;
+    const fetchImpl: FetchImpl = () =>
+      Promise.resolve(new Response(failing ? "" : sitemap(), { status: failing ? 503 : 200 }));
+    const core = createFetchCore({ rateLimitMs: 0, fetchImpl, cache });
+    const tree = treeOf(FIXTURE_IDS);
+    const run = (): Promise<CategoryDriftReport> =>
+      checkCategoryDrift({ core, readCategoryTree: () => tree });
+
+    expect(await run()).toMatchObject({ outcome: "clean", stale: false });
+    failing = true;
+    expect(await run()).toMatchObject({ outcome: "clean", stale: true });
+  });
+
   it("reports rather than throws when the sitemap no longer parses", async () => {
     const { report } = harness({ xml: '<?xml version="1.0"?><urlset></urlset>' });
     expect(await report()).toMatchObject({ outcome: "unavailable", reason: "parse_failure" });
   });
 });
 
+describe("what the drift check exits with", () => {
+  it("is 0 for a clean bundle", () => {
+    expect(driftExitCode({ outcome: "clean", bundled_count: 159, live_count: 159, stale: false })).toBe(0);
+  });
+
+  it("is 1 for drift, so a maintainer's script can act on it", () => {
+    expect(
+      driftExitCode({
+        outcome: "drifted",
+        bundled_count: 159,
+        live_count: 160,
+        stale: false,
+        added: [999],
+        removed: [],
+      }),
+    ).toBe(1);
+  });
+
+  it("is 2 when the check could not run, which is not the same as clean", () => {
+    expect(driftExitCode({ outcome: "unavailable", reason: "block", message: "blocked" })).toBe(2);
+  });
+});
+
 describe("what the drift check is not wired into", () => {
-  const source = (path: string): string =>
-    readFileSync(new URL(path, import.meta.url), "utf8");
+  const MODULE = "category-drift";
+  const TOOLS = new URL("../tools/", import.meta.url);
 
   /**
    * It is explicitly invoked and opportunistic: nothing on the request path may
    * reach for it, or it would run on every call (SPEC 7).
+   *
+   * Every tool is enumerated rather than listed, so a seventh one is covered
+   * the day it lands — and the module's own path is asserted first, so renaming
+   * it cannot make the whole check pass by matching nothing.
    */
   it("is imported by no tool and by no server wiring", () => {
-    for (const path of ["../server.ts", "../tools/find-category.ts", "../tools/search-listings.ts"]) {
-      expect(source(path), path).not.toContain("category-drift");
+    expect(existsSync(new URL(`./${MODULE}.ts`, import.meta.url))).toBe(true);
+
+    const tools = readdirSync(TOOLS)
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts"))
+      .map((file) => new URL(file, TOOLS));
+    // The six of SPEC 4, plus `tool-result.ts` and `descriptions` helpers.
+    expect(tools.length).toBeGreaterThanOrEqual(6);
+
+    for (const file of [new URL("../server.ts", import.meta.url), ...tools]) {
+      expect(readFileSync(file, "utf8"), file.pathname).not.toContain(MODULE);
     }
   });
 });

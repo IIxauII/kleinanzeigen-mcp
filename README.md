@@ -98,7 +98,7 @@ There is no second knob. A default location was considered and rejected: it is a
 - **`Retry-After` is honoured exactly**, up to a 60 s cap, after which the call fails loudly rather than hanging.
 - **The block circuit breaker.** A detected block trips it, and it is never retried through.
 - **The User-Agent**, which names this project and links to it: `kleinanzeigen-mcp/<version> (+https://github.com/IIxauII/kleinanzeigen-mcp)`. The site operator has something to block.
-- **The deleted-ad guard**, which refuses to report the browse page a dead listing redirects to as if it were a listing.
+- **The deleted-ad guard**, which refuses to report the browse page a deleted listing redirects to as if it were a listing.
 
 **The delay is a politeness dial you own; these four are the project's compliance stance, fixed in code.** There is no flag that turns them off, and that is what makes the claims above verifiable rather than aspirational.
 
@@ -121,6 +121,8 @@ It fetches **one file** — `sitemap_categories.xml`, 2 094 B gzipped on the wir
 | `0` | No drift. The same ids, in the same numbers. |
 | `1` | Drift. The added and removed ids are named on stderr, alongside the rebuild command. |
 | `2` | The check could not run — the sitemap was unreachable, or no longer parses. Deliberately not `0`: a check that never reached the sitemap has not established that the bundle is current. |
+
+An argument the binary does not have — a mistyped `--check-drift`, say — is refused with a usage line and exit `64`, before the environment is read at all.
 
 **It writes nothing.** Drift is fixed by regenerating the dataset and shipping a new version:
 

@@ -47,7 +47,7 @@ describe("the package", () => {
     expect(pkg.scripts["check:drift"]).toBe("node dist/index.js --check-drift");
   });
 
-  it("ships no lockfile-less install: the lockfile is committed", () => {
+  it("commits its lockfile, so a cold install resolves the same tree", () => {
     expect(existsSync(new URL("../package-lock.json", import.meta.url))).toBe(true);
   });
 });

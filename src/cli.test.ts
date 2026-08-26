@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DRIFT_CHECK_FLAG, driftExitCode, parseArgv, USAGE } from "./cli.ts";
+import { DRIFT_CHECK_FLAG, parseArgv, USAGE } from "./cli.ts";
 
 describe("the command line", () => {
   it("serves over stdio when given nothing, which is the whole point of the binary", () => {
@@ -21,29 +21,23 @@ describe("the command line", () => {
     expect(parseArgv([DRIFT_CHECK_FLAG, "--verbose"])).toMatchObject({ mode: "refused" });
   });
 
-  it("refuses the flag twice, because a repeat means the caller meant something else", () => {
-    expect(parseArgv([DRIFT_CHECK_FLAG, DRIFT_CHECK_FLAG])).toMatchObject({ mode: "refused" });
-  });
-});
-
-describe("what the drift check exits with", () => {
-  it("is 0 for a clean bundle", () => {
-    expect(driftExitCode({ outcome: "clean", bundled_count: 159, live_count: 159 })).toBe(0);
-  });
-
-  it("is 1 for drift, so a maintainer's script can act on it", () => {
-    expect(
-      driftExitCode({
-        outcome: "drifted",
-        bundled_count: 159,
-        live_count: 160,
-        added: [999],
-        removed: [],
-      }),
-    ).toBe(1);
+  it("refuses the flag twice, and says a repeat is what it refused", () => {
+    // Never "unrecognised": that argument is recognised, and telling an
+    // operator otherwise about the argument in front of them is the failure
+    // this refusal exists to prevent.
+    expect(parseArgv([DRIFT_CHECK_FLAG, DRIFT_CHECK_FLAG])).toEqual({
+      mode: "refused",
+      message: `${DRIFT_CHECK_FLAG} given more than once\n${USAGE}`,
+    });
   });
 
-  it("is 2 when the check could not run, which is not the same as clean", () => {
-    expect(driftExitCode({ outcome: "unavailable", reason: "block", message: "blocked" })).toBe(2);
+  it("lines its usage descriptions up under one another", () => {
+    // The indent, an optional label, and the gap after it — so a label line and
+    // a continuation line both measure to where their description starts.
+    const descriptionColumn = /^ {2}(?:\S+(?: \S+)*)? +(?=\S)/u;
+    const indented = USAGE.split("\n").filter((line) => line.startsWith("  "));
+    expect(indented).toHaveLength(3);
+    const columns = indented.map((line) => descriptionColumn.exec(line)![0].length);
+    expect(new Set(columns)).toEqual(new Set([19]));
   });
 });
