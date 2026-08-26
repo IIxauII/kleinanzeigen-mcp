@@ -120,7 +120,7 @@ It fetches **one file** — `sitemap_categories.xml`, 2 094 B gzipped on the wir
 | --- | --- |
 | `0` | No drift. The same ids, in the same numbers. |
 | `1` | Drift. The added and removed ids are named on stderr, alongside the rebuild command. |
-| `2` | The check could not run — the sitemap was unreachable, or no longer parses. Deliberately not `0`: a check that never reached the sitemap has not established that the bundle is current. |
+| `2` | The check could not run — the sitemap was unreachable, no longer parses, or answered only from the cache after a failure. Deliberately not `0`: a check that never reached the sitemap has not established that the bundle is current. |
 
 An argument the binary does not have — a mistyped `--check-drift`, say — is refused with a usage line and exit `64`, before the environment is read at all.
 

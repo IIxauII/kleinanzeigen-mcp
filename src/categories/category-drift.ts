@@ -111,11 +111,17 @@ export async function checkCategoryDrift({
  * What the process exits with after a check: 0 clean, 1 drifted, 2 could not be
  * checked. The third is deliberately not 0 — a check that never reached the
  * sitemap has not established that the bundle is current (SPEC 7).
+ *
+ * **A stale clean is a 2, not a 0.** The exit code is the machine-readable
+ * answer, and a diff computed against cached bytes after a failure is a claim
+ * about an earlier moment — which is the same thing 2 already means. A stale
+ * *drift* stays 1: those cached bytes were a real answer once, so a difference
+ * against the bundle is real drift whenever it was read.
  */
 export function driftExitCode(report: CategoryDriftReport): number {
   switch (report.outcome) {
     case "clean":
-      return 0;
+      return report.stale ? 2 : 0;
     case "drifted":
       return 1;
     case "unavailable":
