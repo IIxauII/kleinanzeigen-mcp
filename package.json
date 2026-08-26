@@ -25,11 +25,12 @@
     "capture:shop-fixtures": "node --experimental-transform-types scripts/capture-shop-fixtures.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "cheerio": "^1.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "@types/node": "^22.19.2",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",

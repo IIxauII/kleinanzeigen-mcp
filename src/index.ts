@@ -1,4 +1,4 @@
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { checkCategoryDrift, driftExitCode } from "./categories/category-drift.ts";
 import { parseArgv } from "./cli.ts";
 import { readRateLimitMs, RATE_LIMIT_ENV_VAR } from "./config.ts";

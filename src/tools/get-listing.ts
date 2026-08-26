@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ENVELOPE_OUTPUT_SHAPE } from "../envelope.ts";
 import { getFetchCore } from "../fetch/core.ts";
@@ -54,7 +54,7 @@ export function registerGetListing(server: McpServer): void {
     {
       description: GET_LISTING_DESCRIPTION,
       inputSchema: GetListingArgsSchema,
-      outputSchema: OutputSchema.shape,
+      outputSchema: OutputSchema,
     },
     async ({ ad_id }: GetListingArgs) => {
       try {

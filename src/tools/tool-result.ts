@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import { FetchError } from "../fetch/errors.ts";
 import { log } from "../logging.ts";
 
