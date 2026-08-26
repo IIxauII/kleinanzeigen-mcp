@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:drift": "node dist/index.js --check-drift",
     "generate:category-tree": "node scripts/generate-category-tree.ts",
     "generate:cities": "node scripts/generate-cities.ts",
     "capture:search-fixtures": "node --experimental-transform-types scripts/capture-search-fixtures.ts",

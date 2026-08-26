@@ -15,17 +15,19 @@
  */
 import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  CATEGORIES_SITEMAP_URL,
+  parseCategorySitemap,
+  type CategorySitemapEntry,
+} from "../src/categories/category-sitemap.ts";
 import type { CategoryNode } from "../src/categories/category-tree.ts";
 import { USER_AGENT } from "../src/user-agent.ts";
 
 const ORIGIN = "https://www.kleinanzeigen.de";
-const SITEMAP_URL = `${ORIGIN}/sitemap_categories.xml`;
 const OUTPUT = new URL("../data/category-tree.json", import.meta.url);
 
 /** Personal-scale politeness: serialised, no bursting (SPEC 2.8). */
 const REQUEST_GAP_MS = 1500;
-
-type SitemapEntry = { category_id: number; slug: string; path: string };
 
 function fail(message: string): never {
   throw new Error(`category tree generation failed: ${message}`);
@@ -49,26 +51,6 @@ async function get(url: string): Promise<string> {
   return body;
 }
 
-/** The depth-first id list, in sitemap order. */
-function readSitemap(xml: string): SitemapEntry[] {
-  const $ = cheerio.load(xml, { xml: true });
-  const entries = $("url > loc")
-    .toArray()
-    .map((element) => {
-      const loc = $(element).text().trim();
-      const match = /^https:\/\/www\.kleinanzeigen\.de\/s-(.+)\/c(\d+)$/.exec(loc);
-      const slug = match?.[1];
-      const id = match?.[2];
-      if (slug === undefined || id === undefined) fail(`unrecognised sitemap entry ${loc}`);
-      return { category_id: Number(id), slug, path: `/s-${slug}/c${id}` };
-    });
-  if (entries.length === 0) fail("the sitemap listed no categories");
-
-  const ids = new Set(entries.map((entry) => entry.category_id));
-  if (ids.size !== entries.length) fail("the sitemap repeated a category id");
-  return entries;
-}
-
 /** Top-level ids in nav order, and every label the nav does render. */
 function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<number, string> } {
   const $ = cheerio.load(html);
@@ -90,7 +72,7 @@ function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<num
 }
 
 /** Recovers one label the nav omits, from its parent's browse page. */
-async function recoverLabel(node: SitemapEntry, parentPath: string): Promise<string> {
+async function recoverLabel(node: CategorySitemapEntry, parentPath: string): Promise<string> {
   const $ = cheerio.load(await get(`${ORIGIN}${parentPath}`));
   const label = $(`a[href='${node.path}']`).first().text().trim();
   if (label === "") fail(`no label for c${node.category_id} on its parent's browse page`);
@@ -98,7 +80,7 @@ async function recoverLabel(node: SitemapEntry, parentPath: string): Promise<str
 }
 
 async function generate(): Promise<CategoryNode[]> {
-  const entries = readSitemap(await get(SITEMAP_URL));
+  const entries = parseCategorySitemap(await get(CATEGORIES_SITEMAP_URL));
   const { topLevelIds, labels } = readHomepageNav(await get(`${ORIGIN}/`));
 
   const topLevel = new Set(topLevelIds);
