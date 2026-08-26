@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimised to the shape the parser reads (SPEC 8.6): three top-level markers
+  and two subcategories each, in the real sitemap's depth-first order, with the
+  `lastmod` the real file carries so the parser is pinned to ignoring it.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-auto-rad-boot/c210</loc>
+    <lastmod>2026-08-25</lastmod>
+    <changefreq>daily</changefreq>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-autos/c216</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-fahrraeder/c217</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-eintrittskarten-tickets/c231</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-bahn-oepnv/c286</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-zu-verschenken-tauschen/c192</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-tauschen/c273</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+</urlset>

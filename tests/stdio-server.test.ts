@@ -99,6 +99,27 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
     expect(stdout).toBe("");
   });
 
+  it("refuses an argument it does not have, before it reads anything else", async () => {
+    const child = spawnProcess(process.execPath, [BUNDLE, "--check-dirft"], {
+      // An invalid knob too, to pin the order: argv is refused first, so the
+      // operator is told about the typo they can see rather than the one they
+      // cannot (SPEC 8.3).
+      env: { ...process.env, KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "soon" },
+    });
+    let stderr = "";
+    let stdout = "";
+    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
+    const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));
+
+    expect(code).toBe(64);
+    expect(stderr).toContain('unrecognised argument "--check-dirft"');
+    expect(stderr).toContain("usage: kleinanzeigen-mcp [--check-drift]");
+    expect(stderr).not.toContain("KLEINANZEIGEN_MCP_RATE_LIMIT_MS");
+    expect(stderr).not.toContain("server_started");
+    expect(stdout).toBe("");
+  });
+
   it("starts on a valid rate limit", async () => {
     const child = spawnProcess(process.execPath, [BUNDLE], {
       env: { ...process.env, KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "5000" },
