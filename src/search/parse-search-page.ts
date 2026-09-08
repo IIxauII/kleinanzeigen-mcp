@@ -102,13 +102,31 @@ function posting(rendered: string, promoted: boolean, ad_id: string, now?: Date)
   throw new ParseError(`organic row ${ad_id} has no posting date`);
 }
 
+/**
+ * The row's title, off **either** heading the site renders: the linked
+ * `<h2><a>`, and the unlinked `<h2><span class="ellipsis ref-not-linked">` it
+ * uses for a sizeable minority of rows — 13 of 27 on `?keywords=ps5` — which
+ * carries its target in `data-url` rather than an `href`.
+ *
+ * The unlinked form costs the parser nothing else: the row's own `data-href`
+ * is what the URL is read from either way. Reading only the anchor turned this
+ * variant into a `ParseError` that failed the **whole page**, since one
+ * unreadable row fails the parse (SPEC 5.8).
+ *
+ * A row carrying neither heading did lose it to a DOM change, and shouts.
+ */
+function heading(article: Selection, ad_id: string): string {
+  const title = text(article.find("h2 a, h2 span.ellipsis").first());
+  if (title === "") throw new ParseError(`row ${ad_id} has no title`);
+  return title;
+}
+
 function parseRow($: cheerio.CheerioAPI, article: Selection, promoted: boolean, now?: Date): SearchRow {
   const ad_id = article.attr("data-adid");
   const href = article.attr("data-href");
   if (ad_id === undefined || href === undefined) throw new ParseError("a row lost its ad id");
 
-  const title = text(article.find("h2 a").first());
-  if (title === "") throw new ParseError(`row ${ad_id} has no title`);
+  const title = heading(article, ad_id);
 
   const priced = article.find("p.aditem-main--middle--price-shipping--price").first();
   const wasPriced = article.find("p.aditem-main--middle--price-shipping--old-price").first();
