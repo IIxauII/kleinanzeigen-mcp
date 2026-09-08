@@ -94,7 +94,9 @@ describe("every committed fixture", () => {
     expect(
       leaks((body, _name, report) => {
         for (const [, name] of body.matchAll(SHOP_TITLE)) {
-          if (!SYNTHETIC_SHOP.test(name!)) report(`title="Zum shop ${name}"`);
+          // Trimmed, as the link text is: the site pads some of these titles
+          // with a trailing space, which is its markup and identifies nobody.
+          if (!SYNTHETIC_SHOP.test(name!.trim())) report(`title="Zum shop ${name}"`);
         }
       }),
     ).toEqual([]);
