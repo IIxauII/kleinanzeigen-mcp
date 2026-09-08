@@ -8,8 +8,10 @@
  * SPEC 8.6 asks for three properties at once, and each rules out an easier
  * option: fixtures are **hand-captured out of band** (verbatim capture by the
  * server would republish real ads), **minimised** to the DOM the parser reads,
- * and **redacted** — free text, seller names, exact locations and image URLs
- * replaced with synthetic values. Fully synthetic fixtures were rejected too:
+ * and **redacted** to the rule `redact.ts` states — nothing off the live page
+ * survives unless it identifies nobody, whether or not a parser reads it, which
+ * is why unread attributes and link titles are scrubbed here alongside the
+ * fields §5.1 names. Fully synthetic fixtures were rejected too:
  * they drift from the real DOM and the parser tests end up proving only that
  * the parser parses the fixture.
  *
@@ -78,6 +80,25 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
   const rows: string[] = [];
   $("#srchrslt-adtable > li.ad-listitem").each((index, li) => {
     const $li = $(li);
+    // Both of these run on the whole slot and **before** the banner branch
+    // below, so a slot kept verbatim is scrubbed too: what the parser drops is
+    // still captured, and a tracker in a banner is as real as one in a row.
+    //
+    // The store-click tracker quotes the row's real ad id where no selector
+    // looks — `data-gaevent="…partner=pro;partneradid=3400000107"`.
+    $li.find("[data-gaevent]").each((_, node) => {
+      $(node).attr("data-gaevent", redact.gaevent($(node).attr("data-gaevent")!));
+    });
+    // A PRO row names its shop twice: `title="Zum shop …"` on both the badge
+    // link and the name link, and the name again as the second link's text.
+    $li.find("a[title]").each((_, link) => {
+      const shop = /^(Zum shop\s+)(.+)$/u.exec($(link).attr("title")!);
+      if (shop === null) return;
+      const standIn = redact.shop(shop[2]!);
+      $(link).attr("title", `${shop[1]}${standIn}`);
+      $(link).find("span").text(standIn);
+    });
+
     const article = $li.find("article.aditem[data-adid]").first();
     if (article.length === 0) {
       // An ad banner: 5–8 per page, dropped silently by the parser (SPEC 5.1).
