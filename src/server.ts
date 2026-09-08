@@ -27,7 +27,21 @@ export function createServer({
   readCityDataset = loadCityDataset,
 }: DatasetReaders = {}): McpServer {
   const server = new McpServer(
-    { name: "kleinanzeigen-mcp", version: VERSION },
+    {
+      name: "kleinanzeigen-mcp",
+      version: VERSION,
+      // The clipped stem, lowercase and verbatim: it deliberately does not
+      // match the `claude mcp add kleinanzeigen` install handle, and puts
+      // distance between this project's display name and the site's
+      // trademark. It states neither read-only nor unofficial — the
+      // description and the README carry those (SPEC 4.6).
+      title: "kanzeigen",
+      // One string, reused verbatim in five slots: `package.json`, here,
+      // `server.json`, the MCPB manifest and `plugin.json` (SPEC 4.6, 8.7).
+      description: "A read-only, robots-clean MCP server over kleinanzeigen.de",
+      websiteUrl: "https://github.com/IIxauII/kleinanzeigen-mcp",
+      // No `icons`, here or on any tool — SPEC 4.6 gives the three reasons.
+    },
     { capabilities: { tools: {} } },
   );
   registerSearchListings(server, readCityDataset);

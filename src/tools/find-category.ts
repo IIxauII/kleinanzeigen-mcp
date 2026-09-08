@@ -4,6 +4,7 @@ import { CategoryNodeSchema, type CategoryTree } from "../categories/category-tr
 import { findCategories } from "../categories/find-categories.ts";
 import { ENVELOPE_OUTPUT_SHAPE, localEnvelope } from "../envelope.ts";
 import { log } from "../logging.ts";
+import { READS_BUNDLED_DATASET } from "./annotations.ts";
 import { toolResult } from "./tool-result.ts";
 
 /** SPEC 4.4, verbatim. */
@@ -33,7 +34,13 @@ const outputSchema = z.object({
 export function registerFindCategory(server: McpServer, readCategoryTree: () => CategoryTree): void {
   server.registerTool(
     "find_category",
-    { description: FIND_CATEGORY_DESCRIPTION, inputSchema, outputSchema },
+    {
+      title: "Find categories",
+      description: FIND_CATEGORY_DESCRIPTION,
+      annotations: READS_BUNDLED_DATASET,
+      inputSchema,
+      outputSchema,
+    },
     ({ query }) => {
       const matches = findCategories(readCategoryTree(), query);
       // The envelope rides on every result, request or no request: `fetched_at`
