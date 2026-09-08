@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Minimised to the shape the parser reads (SPEC 8.6): three `/s-…/l<id>`
+  entries, and one id-less `/stadt/` landing page of the 140 the sitemap
+  withholds — here Köln, percent-encoded exactly as the real file writes it.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-bayern/l5510</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-augsburg/l4127</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/s-kr-muenchen/l6410</loc>
+  </url>
+  <url>
+    <loc>https://www.kleinanzeigen.de/stadt/K%C3%B6ln/</loc>
+  </url>
+</urlset>

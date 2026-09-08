@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -43,11 +43,53 @@ describe("the package", () => {
     expect(pkg.engines.node).toBe(">=22");
   });
 
-  it("gives a maintainer the drift check as a script of its own", () => {
-    expect(pkg.scripts["check:drift"]).toBe("node dist/index.js --check-drift");
+  it("runs the drift check from the clone, not through the shipped binary", () => {
+    // The check lives beside the two generators whose fetch code it shares, and
+    // the binary it left takes no arguments. The cost is stated rather than
+    // hidden: a published user cannot check their own bundle (SPEC 7, 8.3, 9.17).
+    expect(pkg.scripts["check:drift"]).toBe("node scripts/check-drift.ts");
+    expect(existsSync(new URL("../scripts/check-drift.ts", import.meta.url))).toBe(true);
+    expect(pkg.files).not.toContain("scripts");
   });
 
   it("commits its lockfile, so a cold install resolves the same tree", () => {
     expect(existsSync(new URL("../package-lock.json", import.meta.url))).toBe(true);
+  });
+});
+
+/**
+ * `npm run check:drift` and the two generators are `node scripts/*.ts` — plain
+ * Node, no build step, no loader — and they import `src/` for the parsers they
+ * share with the server. Node runs them under **strip-only** type stripping,
+ * which erases types and refuses anything that would need emitting: a
+ * constructor parameter property, an `enum`, a `namespace`.
+ *
+ * `tsc` and `tsup` both accept all three, so nothing else in this repo notices
+ * until a maintenance script dies at import time on syntax the server never
+ * minded (SPEC 7, 8.6).
+ */
+describe("what the maintenance scripts can import", () => {
+  const SRC = new URL("../src/", import.meta.url);
+
+  function sources(directory: URL): URL[] {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const child = new URL(entry.name + (entry.isDirectory() ? "/" : ""), directory);
+      if (entry.isDirectory()) return sources(child);
+      return entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts") ? [child] : [];
+    });
+  }
+
+  it("holds no syntax Node's strip-only mode refuses", () => {
+    const parameterProperty = /constructor\s*\([^)]*?\b(?:readonly|private|public|protected)\b/su;
+    const emitting = /^\s*(?:export\s+)?(?:const\s+)?(?:enum|namespace)\s/mu;
+
+    const offenders = sources(SRC)
+      .filter((file) => {
+        const source = readFileSync(file, "utf8");
+        return parameterProperty.test(source) || emitting.test(source);
+      })
+      .map((file) => file.pathname);
+
+    expect(offenders).toEqual([]);
   });
 });

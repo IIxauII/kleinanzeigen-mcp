@@ -104,36 +104,6 @@ There is no second knob. A default location was considered and rejected: it is a
 
 ---
 
-## Maintenance: the category drift check
-
-The category taxonomy ships as a build-time dataset. If kleinanzeigen adds or removes a category, the bundle goes stale — and nothing in the running server would notice, because the server never re-fetches it.
-
-The drift check is the affordance for finding that out. It is **explicitly invoked and opportunistic**: it never runs on a tool call.
-
-```bash
-npm run check:drift        # or: node dist/index.js --check-drift
-```
-
-It fetches **one file** — `sitemap_categories.xml`, 2 094 B gzipped on the wire and about 12 KB of XML once decoded — diffs its category-id set against the bundled taxonomy, and exits. It does not serve, and it does not open the transport.
-
-| Exit code | Meaning |
-| --- | --- |
-| `0` | No drift. The same ids, in the same numbers. |
-| `1` | Drift. The added and removed ids are named on stderr, alongside the rebuild command. |
-| `2` | The check could not run — the sitemap was unreachable, no longer parses, or answered only from the cache after a failure. Deliberately not `0`: a check that never reached the sitemap has not established that the bundle is current. |
-
-An argument the binary does not have — a mistyped `--check-drift`, say — is refused with a usage line and exit `64`, before the environment is read at all.
-
-**It writes nothing.** Drift is fixed by regenerating the dataset and shipping a new version:
-
-```bash
-npm run generate:category-tree
-```
-
-It is also **not conditioned on the sitemap index's `lastmod`**. That timestamp marks a whole-index regeneration, not a taxonomy change, so reading it would fire on every regeneration and stay silent through a real one.
-
----
-
 ## Known limits
 
 These are things you will hit. None of them is a bug.

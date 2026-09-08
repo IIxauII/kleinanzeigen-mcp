@@ -2,7 +2,7 @@
 
 For a maintainer standing in a clone. Nothing here applies to an installed user — the shipped binary takes no arguments and cannot check itself ([SPEC](../SPEC.md) §8.3, §9.17).
 
-> **Status.** This is the specified procedure, settled on the packaging map. The scripts and workflows it describes land through the build tickets on that map; until they do, this file is what they are built against rather than a description of what is on disk.
+> **Status.** This is the specified procedure, settled on the packaging map. **The drift check below is on disk** — `scripts/check-drift.ts`, 19 requests, the exit codes as tabled. The workflows that call it — the monthly cron and the release gate — land through the CI and release tickets on that map; until they do, everything from *The monthly cron* onwards is what they are built against rather than a description of what is on disk.
 
 ## The drift check
 

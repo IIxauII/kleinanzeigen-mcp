@@ -99,24 +99,26 @@ describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
     expect(stdout).toBe("");
   });
 
-  it("refuses an argument it does not have, before it reads anything else", async () => {
-    const child = spawnProcess(process.execPath, [BUNDLE, "--check-dirft"], {
-      // An invalid knob too, to pin the order: argv is refused first, so the
-      // operator is told about the typo they can see rather than the one they
-      // cannot (SPEC 8.3).
-      env: { ...process.env, KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "soon" },
-    });
+  it("takes no arguments at all: it serves, and there is no second thing it does", async () => {
+    // `--check-drift` left the binary when the check moved to
+    // `scripts/check-drift.ts`, and the usage string and the exit-64 refusal
+    // path went with it. What is left has nothing to refuse (SPEC 7, 8.3).
+    const child = spawnProcess(process.execPath, [BUNDLE, "--check-drift"]);
     let stderr = "";
     let stdout = "";
-    child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString()));
-    const code = await new Promise<number | null>((resolve) => child.on("exit", resolve));
+    const started = await new Promise<string>((resolve) => {
+      child.stderr.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString();
+        resolve(stderr);
+      });
+    });
+    child.kill();
 
-    expect(code).toBe(64);
-    expect(stderr).toContain('unrecognised argument "--check-dirft"');
-    expect(stderr).toContain("usage: kleinanzeigen-mcp [--check-drift]");
-    expect(stderr).not.toContain("KLEINANZEIGEN_MCP_RATE_LIMIT_MS");
-    expect(stderr).not.toContain("server_started");
+    expect(JSON.parse(started)).toMatchObject({ event: "server_started" });
+    expect(stderr).not.toContain("usage:");
+    expect(stderr).not.toContain("category_drift");
+    // stdout belongs to the transport, and no drift report was written to it.
     expect(stdout).toBe("");
   });
 
