@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ParseError } from "../fetch/errors.ts";
 import { parseSearchPage } from "./parse-search-page.ts";
+import { ORIGIN } from "./search-url.ts";
 
 /**
  * Captured live, minimised to the DOM the parser reads and redacted, by
@@ -111,6 +112,25 @@ describe("the rows of a search results page", () => {
     expect(posted).toContainEqual({ value: "2026-08-25T14:14:00+02:00", precision: "minute" });
     expect(posted).toContainEqual({ value: "2026-08-24T22:00:00+02:00", precision: "minute" });
     expect(posted).toContainEqual({ value: "2026-08-23", precision: "day" });
+  });
+
+  it("reads the unlinked heading the site renders on a sizeable minority of rows", () => {
+    // `<h2><span class="ellipsis ref-not-linked" data-url="…">` rather than
+    // `<h2><a href="…">`. Reading only the anchor made one such row a
+    // `ParseError` that failed the whole page, and 9 of this fixture's 27 rows
+    // are unlinked.
+    const body = fixture("search-unlinked-title");
+    expect(body.match(/ref-not-linked/gu)).toHaveLength(9);
+    const page = parse("search-unlinked-title");
+    expect(page.listings).toHaveLength(27);
+    expect(page.listings.every((listing) => listing.title !== "")).toBe(true);
+  });
+
+  it("reads an unlinked row's url off the row, not off the heading it has no anchor for", () => {
+    const page = parse("search-unlinked-title");
+    expect(page.listings.every((listing) => listing.url.startsWith(`${ORIGIN}/s-anzeige/`))).toBe(
+      true,
+    );
   });
 });
 
@@ -230,6 +250,18 @@ describe("the loud failures", () => {
     );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /organic row \d+ has no posting date/u,
+    );
+  });
+
+  it("throws when a row carries neither heading the site renders", () => {
+    // Losing the anchor is the site's own unlinked variant and normal; losing
+    // both it and the unlinked span is a DOM change, and shouts (SPEC 5.8).
+    const doctored = fixture("search-unlinked-title").replaceAll(
+      /<h2 class="text-module-begin">[\s\S]*?<\/h2>/gu,
+      '<h2 class="text-module-begin"></h2>',
+    );
+    expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
+      /row \d+ has no title/u,
     );
   });
 
