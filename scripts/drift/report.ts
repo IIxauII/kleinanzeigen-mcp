@@ -9,9 +9,10 @@
  * (SPEC 7, `docs/maintenance.md`).
  */
 
-export const DATASETS = ["categories", "locations"] as const;
+/** Both bundled datasets, in the order a run reports them. */
+export const DATASET_NAMES = ["categories", "locations"] as const;
 
-export type DatasetName = (typeof DATASETS)[number];
+export type DatasetName = (typeof DATASET_NAMES)[number];
 
 /** A node that kept its id and changed its German name. */
 export type Rename = { id: number; from: string; to: string };
@@ -38,11 +39,16 @@ export const REBUILD_COMMANDS: Record<DatasetName, string> = {
 /** How each dataset's ids are written down: `c210`, `l3331`. */
 const ID_PREFIX: Record<DatasetName, string> = { categories: "c", locations: "l" };
 
-/** The live side of a dataset: every id it published, and the names it carried, if any. */
+/** The live side of a dataset: every id it published, and the names it carried. */
 export type LiveDataset = {
   ids: ReadonlySet<number>;
-  /** Absent when the legs that ran carry no names — then renames are not checked, not "none". */
-  names?: ReadonlyMap<number, string>;
+  /**
+   * `null` where the legs that ran carry no names at all — the categories
+   * sitemap has ids and no labels — which is *renames not checked* rather than
+   * *no renames*. Stated rather than left absent, so the difference cannot be
+   * lost by forgetting a field.
+   */
+  names: ReadonlyMap<number, string> | null;
 };
 
 const ascending = (left: number, right: number): number => left - right;
@@ -64,7 +70,7 @@ export function reportFor(
   const added = [...live.ids].filter((id) => !bundled.has(id)).sort(ascending);
   const removed = [...bundled.keys()].filter((id) => !live.ids.has(id)).sort(ascending);
   const renamed: Rename[] = [];
-  for (const [id, name] of live.names ?? []) {
+  for (const [id, name] of live.names ?? new Map<number, string>()) {
     const was = bundled.get(id);
     if (was !== undefined && was !== name) renamed.push({ id, from: was, to: name });
   }
@@ -98,10 +104,12 @@ export function driftExitCode(reports: readonly DatasetReport[]): number {
   return 0;
 }
 
-/** At most ten ids on a line; a taxonomy-wide change should not fill a terminal. */
-function sample(ids: readonly number[], prefix: string): string {
-  const shown = ids.slice(0, 10).map((id) => `${prefix}${id}`).join(", ");
-  return ids.length > 10 ? `${shown}, … and ${ids.length - 10} more` : shown;
+/** A taxonomy-wide change should not fill a terminal: ten, then a count. */
+const SHOWN = 10;
+
+function firstFew<T>(items: readonly T[], render: (item: T) => string): string[] {
+  const shown = items.slice(0, SHOWN).map(render);
+  return items.length > SHOWN ? [...shown, `… and ${items.length - SHOWN} more`] : shown;
 }
 
 /**
@@ -122,17 +130,19 @@ export function formatReport(reports: readonly DatasetReport[]): string[] {
       continue;
     }
     lines.push(`${report.dataset}: DRIFTED — ${counts}`);
+    const ids = (list: readonly number[]) =>
+      firstFew(list, (id) => `${prefix}${id}`).join(", ");
     if (report.added.length > 0) {
-      lines.push(`  added ${report.added.length}: ${sample(report.added, prefix)}`);
+      lines.push(`  added ${report.added.length}: ${ids(report.added)}`);
     }
     if (report.removed.length > 0) {
-      lines.push(`  REMOVED ${report.removed.length}: ${sample(report.removed, prefix)}`);
+      lines.push(`  REMOVED ${report.removed.length}: ${ids(report.removed)}`);
     }
-    for (const { id, from, to } of report.renamed.slice(0, 10)) {
-      lines.push(`  renamed: ${prefix}${id} ${from} → ${to}`);
-    }
-    if (report.renamed.length > 10) {
-      lines.push(`  … and ${report.renamed.length - 10} more rename(s)`);
+    for (const line of firstFew(
+      report.renamed,
+      ({ id, from, to }) => `renamed: ${prefix}${id} ${from} → ${to}`,
+    )) {
+      lines.push(`  ${line}`);
     }
     lines.push(`  rebuild: ${REBUILD_COMMANDS[report.dataset]}`);
   }

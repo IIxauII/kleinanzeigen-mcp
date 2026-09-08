@@ -21,7 +21,7 @@ import {
   type CategorySitemapEntry,
 } from "../src/categories/category-sitemap.ts";
 import type { CategoryNode } from "../src/categories/category-tree.ts";
-import { createGet, ORIGIN } from "./lib/site.ts";
+import { createGet, note, ORIGIN } from "./lib/site.ts";
 
 const OUTPUT = new URL("../data/category-tree.json", import.meta.url);
 
@@ -29,12 +29,8 @@ function fail(message: string): never {
   throw new Error(`category tree generation failed: ${message}`);
 }
 
-function note(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
-
 /** Serialised at the shared 1500 ms gap, the same one the drift check holds (SPEC 2.8). */
-const get = createGet({ note });
+const get = createGet();
 
 /** Top-level ids in nav order, and every label the nav does render. */
 function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<number, string> } {
@@ -147,7 +143,11 @@ function reportDrift(nodes: CategoryNode[]): void {
   for (const node of renamed) note(`renamed: c${node.category_id} → ${node.name}`);
 }
 
-const nodes = await generate();
+// The shared `get` throws a bare `SiteError`; `fail` is what names this script
+// in every other message, so a failure reads the same wherever it came from.
+const nodes = await generate().catch((error: unknown) =>
+  fail(error instanceof Error ? error.message : String(error)),
+);
 const topLevelCount = nodes.filter((node) => node.parent_id === null).length;
 
 reportDrift(nodes);

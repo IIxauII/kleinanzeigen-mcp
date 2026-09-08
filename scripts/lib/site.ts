@@ -32,14 +32,23 @@ export class SiteError extends Error {
   }
 }
 
+/**
+ * Where a maintenance script talks: stderr, always. stdout is not a channel
+ * these scripts have — the drift check's report is read from stderr by a
+ * maintainer and by CI alike.
+ */
+export function note(message: string): void {
+  process.stderr.write(`${message}\n`);
+}
+
 /** One GET, already serialised against the last one. Throws `SiteError`. */
 export type Get = (url: string) => Promise<string>;
 
 export type GetOptions = {
   gapMs?: number;
   fetchImpl?: typeof fetch;
-  /** Where the per-request line goes. Silent by default; the scripts pass stderr. */
-  note?: (message: string) => void;
+  /** Where the per-request line goes. `note` by default, so a run is never silent. */
+  onRequest?: (message: string) => void;
 };
 
 /**
@@ -50,7 +59,7 @@ export type GetOptions = {
 export function createGet({
   gapMs = REQUEST_GAP_MS,
   fetchImpl = fetch,
-  note = () => {},
+  onRequest = note,
 }: GetOptions = {}): Get {
   let lastRequestAt = 0;
 
@@ -68,7 +77,7 @@ export function createGet({
     }
     if (!response.ok) throw new SiteError(`GET ${url} answered ${response.status}`);
     const body = await response.text();
-    note(`GET ${url} → ${response.status}, ${body.length} chars`);
+    onRequest(`GET ${url} → ${response.status}, ${body.length} chars`);
     return body;
   };
 }

@@ -27,6 +27,7 @@ export async function checkCategoryDrift(
     const live = parseCategorySitemap(await get(CATEGORIES_SITEMAP_URL));
     return reportFor("categories", bundled, {
       ids: new Set(live.map((entry) => entry.category_id)),
+      names: null,
     });
   } catch (error) {
     return unavailable("categories", error);

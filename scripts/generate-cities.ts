@@ -29,7 +29,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { CityDatasetFile } from "../src/locations/city-dataset.ts";
 import { readCitySitemap, readKatalog, slugFromName, type Place } from "./lib/locations.ts";
-import { CITIES_SITEMAP_URL, createGet, KATALOG_URL } from "./lib/site.ts";
+import { CITIES_SITEMAP_URL, createGet, KATALOG_URL, note } from "./lib/site.ts";
 
 const OUTPUT = new URL("../data/cities.json", import.meta.url);
 
@@ -45,12 +45,8 @@ function fail(message: string): never {
   throw new Error(`city dataset generation failed: ${message}`);
 }
 
-function note(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
-
 /** Serialised at the shared 1500 ms gap, the same one the drift check holds (SPEC 2.8). */
-const get = createGet({ note });
+const get = createGet();
 
 async function generate(): Promise<CityDatasetFile> {
   const { slugs, landingPages } = readCitySitemap(await get(CITIES_SITEMAP_URL));
@@ -150,7 +146,11 @@ function serialise(file: CityDatasetFile): string {
   return `{\n"states": [\n${rows(file.states)}\n],\n"locations": [\n${rows(file.locations)}\n]\n}\n`;
 }
 
-const file = await generate();
+// The shared readers throw a bare `SiteError`; `fail` is what names this script
+// in every other message, so a failure reads the same wherever it came from.
+const file = await generate().catch((error: unknown) =>
+  fail(error instanceof Error ? error.message : String(error)),
+);
 reportDrift(file);
 writeFileSync(OUTPUT, serialise(file), "utf8");
 note(

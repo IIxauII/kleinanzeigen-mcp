@@ -24,28 +24,24 @@
  * a caller decides whether to open an issue from the report rather than from the
  * exit (`docs/maintenance.md`).
  */
-import { driftExitCode, formatReport } from "./drift/report.ts";
+import { DATASET_NAMES, driftExitCode, formatReport, unavailable } from "./drift/report.ts";
 import { readBundledDatasets, runDriftCheck } from "./drift/run.ts";
-import { createGet } from "./lib/site.ts";
-
-function note(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
+import { createGet, note } from "./lib/site.ts";
 
 async function main(): Promise<number> {
-  // A dataset that cannot be read locally exits 2, not 1: nothing was
-  // established about the site, and 1 would have a cron open an issue claiming
-  // drift it never saw.
-  let bundled;
+  // A committed dataset that cannot even be read is reported as both datasets
+  // unavailable — the run never happened, so neither was checked — and exits 2
+  // rather than 1: nothing was established about the site, and 1 would have a
+  // cron open an issue claiming drift it never saw. It goes through the same
+  // report as every other outcome, because "each dataset's outcome is named"
+  // holds on this path too (SPEC 7).
+  let reports;
   try {
-    bundled = readBundledDatasets();
+    reports = await runDriftCheck(createGet(), readBundledDatasets());
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    note(`the committed datasets could not be read: ${message}`);
-    return 2;
+    reports = DATASET_NAMES.map((dataset) => unavailable(dataset, error));
   }
 
-  const reports = await runDriftCheck(createGet({ note }), bundled);
   for (const line of formatReport(reports)) note(line);
   return driftExitCode(reports);
 }

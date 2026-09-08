@@ -229,6 +229,18 @@ describe("the location leg", () => {
     });
   });
 
+  it("refuses a katalog root that no longer lists sixteen federal states", async () => {
+    // The number is what 19 requests assumes and what the generator asserts. A
+    // root listing some other number is a page whose shape moved under us, so
+    // it is a leg that learnt nothing rather than sixteen states' worth of drift.
+    const site = fakeSite({ states: STATES.slice(0, 15) });
+    expect(await checkLocationDrift(site.get, bundledLocations())).toMatchObject({
+      outcome: "unavailable",
+      message: "the catalogue listed 15 federal states, not 16",
+    });
+    expect(site.urls).toEqual([CITIES_SITEMAP_URL, KATALOG_URL]);
+  });
+
   it("abandons the rest of the walk once a leg has failed", async () => {
     // Sixteen more requests into a site that just refused one learn nothing,
     // and they are not polite.

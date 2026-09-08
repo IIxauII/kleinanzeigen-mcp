@@ -1,6 +1,9 @@
 import { readCitySitemap, readKatalog } from "../lib/locations.ts";
-import { CITIES_SITEMAP_URL, KATALOG_URL, type Get } from "../lib/site.ts";
+import { CITIES_SITEMAP_URL, KATALOG_URL, SiteError, type Get } from "../lib/site.ts";
 import { reportFor, unavailable, type DatasetReport } from "./report.ts";
+
+/** Germany has sixteen, the katalog root lists sixteen, and 19 requests assumes sixteen. */
+const FEDERAL_STATES = 16;
 
 /**
  * The location leg: **18 requests** — the cities sitemap, the katalog root, and
@@ -29,6 +32,15 @@ export async function checkLocationDrift(
   try {
     const { slugs } = readCitySitemap(await get(CITIES_SITEMAP_URL));
     const states = readKatalog(await get(KATALOG_URL), "federal states");
+    // The same assertion the generator makes, for the same reason: a root that
+    // lists some other number is a page whose shape changed under us, and the
+    // walk beneath it would be diffing something else. It is reported as a leg
+    // that learnt nothing rather than as sixteen states' worth of drift.
+    if (states.length !== FEDERAL_STATES) {
+      throw new SiteError(
+        `the catalogue listed ${states.length} federal states, not ${FEDERAL_STATES}`,
+      );
+    }
 
     const names = new Map<number, string>(states.map((state) => [state.id, state.name]));
     for (const state of states) {

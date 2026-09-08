@@ -12,16 +12,16 @@ export type BundledDatasets = {
 };
 
 /** Where the committed datasets live in a clone. Never `dist/`: the cron and the release gate check `data/`. */
-export const DATA_DIR = new URL("../../data/", import.meta.url);
+const DATA_DIR = new URL("../../data/", import.meta.url);
 
 /**
  * Reads the two committed datasets through the same schemas the server reads
  * them with, so a dataset that no longer parses fails the check rather than
  * being diffed as an empty set.
  */
-export function readBundledDatasets(dataDir: URL = DATA_DIR): BundledDatasets {
-  const categories = loadCategoryTree(new URL("category-tree.json", dataDir));
-  const locations = loadCityDataset(new URL("cities.json", dataDir));
+export function readBundledDatasets(): BundledDatasets {
+  const categories = loadCategoryTree(new URL("category-tree.json", DATA_DIR));
+  const locations = loadCityDataset(new URL("cities.json", DATA_DIR));
   return {
     categories: new Map(categories.map((node) => [node.category_id, node.name])),
     locations: new Map(locations.map((node) => [node.location_id, node.name])),
@@ -29,9 +29,8 @@ export function readBundledDatasets(dataDir: URL = DATA_DIR): BundledDatasets {
 }
 
 /**
- * One run, **19 requests**, both datasets, serialised at the generators' gap:
- * `sitemap_categories.xml`, `sitemap_cities.xml`, and the `/s-katalog-orte.html`
- * root plus its sixteen state pages — about 28 seconds (SPEC 7).
+ * One run over both datasets: the category leg's one request, then the location
+ * leg's eighteen. `scripts/check-drift.ts` has the budget and the exit codes.
  *
  * **Both datasets are always attempted**, whatever the other one did. A caller
  * decides whether to open an issue from the report, and a dataset whose drift

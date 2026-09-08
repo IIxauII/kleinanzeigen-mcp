@@ -17,7 +17,7 @@ const CATEGORIES = bundled([
 
 describe("one dataset's verdict", () => {
   it("is clean when the ids and the names both agree", () => {
-    expect(reportFor("categories", CATEGORIES, { ids: new Set([216, 210]) })).toEqual({
+    expect(reportFor("categories", CATEGORIES, { ids: new Set([216, 210]), names: null })).toEqual({
       dataset: "categories",
       outcome: "clean",
       bundled_count: 2,
@@ -26,7 +26,7 @@ describe("one dataset's verdict", () => {
   });
 
   it("names what the site gained and what it dropped, each sorted", () => {
-    expect(reportFor("categories", CATEGORIES, { ids: new Set([216, 999, 300]) })).toEqual({
+    expect(reportFor("categories", CATEGORIES, { ids: new Set([216, 999, 300]), names: null })).toEqual({
       dataset: "categories",
       outcome: "drifted",
       bundled_count: 2,
@@ -53,7 +53,7 @@ describe("one dataset's verdict", () => {
   it("does not read a leg that carries no names as evidence of no renames", () => {
     // The categories sitemap has ids and no labels: silence about names is not
     // a claim about them (SPEC 7).
-    expect(reportFor("categories", CATEGORIES, { ids: new Set([210, 216]) })).toMatchObject({
+    expect(reportFor("categories", CATEGORIES, { ids: new Set([210, 216]), names: null })).toMatchObject({
       outcome: "clean",
     });
   });
@@ -125,8 +125,8 @@ describe("the stderr report", () => {
 
   it("points a maintainer at the rebuild for the dataset that moved, and only that one", () => {
     const lines = formatReport([
-      reportFor("categories", CATEGORIES, { ids: new Set([210, 216, 999]) }),
-      reportFor("locations", new Map([[1, "Alt"]]), { ids: new Set([1]) }),
+      reportFor("categories", CATEGORIES, { ids: new Set([210, 216, 999]), names: null }),
+      reportFor("locations", new Map([[1, "Alt"]]), { ids: new Set([1]), names: null }),
     ]).join("\n");
     expect(lines).toContain("npm run generate:category-tree");
     expect(lines).not.toContain("npm run generate:cities");
@@ -137,18 +137,18 @@ describe("the stderr report", () => {
   });
 
   it("shouts about removals, because a removed id stops resolving for a caller", () => {
-    const lines = formatReport([reportFor("locations", bundled([[1, "Alt"]]), { ids: new Set() })]);
+    const lines = formatReport([reportFor("locations", bundled([[1, "Alt"]]), { ids: new Set<number>(), names: null })]);
     expect(lines).toContain("  REMOVED 1: l1");
   });
 
   it("caps a taxonomy-wide change at ten ids and counts the rest", () => {
     const live = new Set(Array.from({ length: 13 }, (_, index) => 1000 + index));
-    const lines = formatReport([reportFor("categories", new Map(), { ids: live })]);
+    const lines = formatReport([reportFor("categories", new Map(), { ids: live, names: null })]);
     expect(lines[1]).toBe("  added 13: c1000, c1001, c1002, c1003, c1004, c1005, c1006, c1007, c1008, c1009, … and 3 more");
   });
 
   it("says a clean dataset is clean, so a clean run is not silence", () => {
-    expect(formatReport([reportFor("categories", CATEGORIES, { ids: new Set([210, 216]) })])) //
+    expect(formatReport([reportFor("categories", CATEGORIES, { ids: new Set([210, 216]), names: null })])) //
       .toEqual(["categories: clean — 2 bundled, 2 live"]);
   });
 });

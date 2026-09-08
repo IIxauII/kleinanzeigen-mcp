@@ -69,7 +69,7 @@ describe("the package", () => {
  * minded (SPEC 7, 8.6).
  */
 describe("what the maintenance scripts can import", () => {
-  const SRC = new URL("../src/", import.meta.url);
+  const STRIPPED = [new URL("../src/", import.meta.url), new URL("../scripts/", import.meta.url)];
 
   function sources(directory: URL): URL[] {
     return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -83,7 +83,12 @@ describe("what the maintenance scripts can import", () => {
     const parameterProperty = /constructor\s*\([^)]*?\b(?:readonly|private|public|protected)\b/su;
     const emitting = /^\s*(?:export\s+)?(?:const\s+)?(?:enum|namespace)\s/mu;
 
-    const offenders = sources(SRC)
+    const files = STRIPPED.flatMap(sources);
+    // Counted first, so a moved directory cannot make this pass by scanning
+    // nothing — the same reason the tool-wiring guard asserts its own path.
+    expect(files.length).toBeGreaterThan(30);
+
+    const offenders = files
       .filter((file) => {
         const source = readFileSync(file, "utf8");
         return parameterProperty.test(source) || emitting.test(source);
