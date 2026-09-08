@@ -27,6 +27,14 @@ import { redactor } from "./redact.ts";
 const OUT_DIR = fileURLToPath(new URL("../tests/fixtures/", import.meta.url));
 
 /**
+ * The marker `search-unlinked-title` exists for. Which rows the site renders
+ * unlinked is its own business and may change, so the capture **asserts** the
+ * variant is there rather than quietly writing a fixture that no longer covers
+ * what it was captured to cover.
+ */
+const UNLINKED = "ref-not-linked";
+
+/**
  * Every shape the parser has to survive, and the one reason each is here.
  * `fahrrad` is broad enough to carry TOP rows and ad banners, and page 51 of it
  * is the silent clamp (SPEC 2.4).
@@ -46,6 +54,11 @@ const PAGES = [
   // An honest empty set, which is a normal result only because §5.4 removed
   // the block that presents the same way (SPEC 5.6, 6.3).
   { name: "search-empty", url: `${ORIGIN}/s-k0?keywords=qzxwvnoresultsforthisquery` },
+  // The unlinked `<h2><span class="ellipsis ref-not-linked">` heading, which
+  // the site renders for a sizeable minority of rows and which `fahrrad`
+  // carries only one or two of. `ps5` runs about half its page that way, so it
+  // is the query that makes the variant reproducible rather than lucky.
+  { name: "search-unlinked-title", url: `${ORIGIN}/s-k0?keywords=ps5`, needs: UNLINKED },
 ] as const;
 
 /**
@@ -92,7 +105,11 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
       .attr("srcset", `${redact.image(index)}?rule=$_35.AUTO`)
       .attr("alt", `${redact.title(index)} Vorschau`);
 
-    article.find("h2 a").text(redact.title(index));
+    // Both headings the site renders — the linked `<h2><a>` and the unlinked
+    // `<h2><span class="ellipsis ref-not-linked" data-url="…">`, whose
+    // `data-url` carries the real slug and is redacted with the rest.
+    article.find("h2 a, h2 span.ellipsis").text(redact.title(index));
+    article.find(`h2 span.${UNLINKED}`).attr("data-url", href);
     article.find("p.aditem-main--middle--description").text(redact.short());
 
     // `<i class="icon-pin-gray"/> 13353 Wedding` and, under a radius, a
@@ -132,9 +149,23 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
 }
 
 const refetch = process.argv.includes("--refetch");
+// Names, if any, narrow the run to those fixtures. A page the site rerenders
+// between captures rewrites whatever it is asked to write, so adding one
+// fixture should not churn the six that were already reviewed:
+//
+//     npm run capture:search-fixtures -- search-unlinked-title
+const only = process.argv.slice(2).filter((argument) => !argument.startsWith("--"));
+const wanted = PAGES.filter((page) => only.length === 0 || only.includes(page.name));
+const unknown = only.filter((name) => !PAGES.some((page) => page.name === name));
+if (unknown.length > 0) throw new Error(`no such fixture: ${unknown.join(", ")}`);
+
 mkdirSync(OUT_DIR, { recursive: true });
-for (const { name, url } of PAGES) {
+for (const page of wanted) {
+  const { name, url } = page;
   const body = await raw(name, url, refetch);
+  const needs = "needs" in page ? page.needs : null;
+  if (needs !== null && !body.includes(needs))
+    throw new Error(`${name}: the live page carries no \`${needs}\`, so the fixture would not cover it`);
   const $ = cheerio.load(body);
   writeFileSync(`${OUT_DIR}${name}.html`, minimise($, name), "utf8");
   process.stderr.write(`wrote ${name}.html\n`);
