@@ -7,9 +7,10 @@
  *
  * Same three properties as the search capture, and the same reasons: pages are
  * **hand-captured out of band**, **minimised** to the DOM §5.1 names, and
- * **redacted** — free text, seller names, exact locations, shop slugs and
- * image URLs replaced with synthetic values. Pass `--refetch` to go back to
- * the network.
+ * **redacted** to the rule `redact.ts` states — nothing off the live page
+ * survives unless it identifies nobody, whether or not a parser reads it, so
+ * unread attributes are scrubbed here alongside the fields §5.1 names. Pass
+ * `--refetch` to go back to the network.
  *
  * A detail page needs more minimising than a results page, not less: it
  * carries a share bar quoting the ad's title, a lightbox repeating every
@@ -64,6 +65,28 @@ const LISTINGS = [
  * second source for a value the canonical URL already carries.
  */
 const UNREAD_KEYS = ["isWantedAdType", "adL1CategoryId", "adL2CategoryId"] as const;
+
+/** The blocks kept whole, in the order the fixture writes them. */
+const SECTIONS = [
+  "#viewad-price",
+  "#viewad-locality",
+  "#viewad-extra-info",
+  "#viewad-description-text",
+  "#viewad-details",
+] as const;
+
+/**
+ * Every root that survives minimising: the sections above, the title, and the
+ * three elements `gallery` and `seller` build their blocks out of. Named once
+ * so a scrub can be aimed at what is kept rather than at the whole page.
+ */
+const KEPT = [
+  "#viewad-title",
+  ...SECTIONS,
+  "#viewad-product",
+  "#viewad-profile-box",
+  "#viewad-commercial-policy-documents",
+] as const;
 
 /**
  * The JS init, reduced to the keys above — **kept line by line as the site
@@ -176,6 +199,18 @@ function minimise($: cheerio.CheerioAPI, name: string, index: number, body: stri
   const redact = redactor();
   const adId = redact.adId(index);
 
+  // Tracking attributes, which nothing reads and which on a results row quote
+  // the row's real ad id. Scrubbed on the blocks that are **kept**: the page's
+  // own related-ads and seller-listings rows carry them by the dozen, and
+  // running over those too would spend the stand-in pool on markup that is
+  // dropped a few lines below.
+  $(KEPT.join(", "))
+    .find("[data-gaevent]")
+    .addBack("[data-gaevent]")
+    .each((_, node) => {
+      $(node).attr("data-gaevent", redact.gaevent($(node).attr("data-gaevent")!));
+    });
+
   const title = $("#viewad-title").first();
   if (title.length === 0) throw new Error(`${name}: no #viewad-title`);
   title.text(redact.title(index));
@@ -197,8 +232,7 @@ function minimise($: cheerio.CheerioAPI, name: string, index: number, body: stri
 
   const kept = [
     $.html(title),
-    ...["#viewad-price", "#viewad-locality", "#viewad-extra-info", "#viewad-description-text", "#viewad-details"]
-      .map((selector) => $.html($(selector).first()))
+    ...SECTIONS.map((selector) => $.html($(selector).first()))
       .filter((html) => html !== ""),
     gallery($, redact, index),
     ...seller($, redact, index, name),

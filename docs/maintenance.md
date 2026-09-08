@@ -44,6 +44,8 @@ The release gate blocks on `1` and on `2`, and there is no flag, no environment 
 
 If the site is unreachable, the release waits. It does not ship stale, and it does not ship unverified.
 
+npm provenance does not make this redundant. The attestation says where the code came from; the gate says the data was checked on the way out. They are different claims and the second one is only true while the gate has no override.
+
 ### When the check reports drift
 
 ```bash
@@ -70,7 +72,7 @@ A GitHub Actions runner is served by the site — verified on three distinct Azu
 
 ## Releasing
 
-One `workflow_dispatch`, four channels, one version. Full reasoning: [ADR-0005](./adr/0005-four-channels-one-artifact-no-provenance.md); the contract: [SPEC](../SPEC.md) §8.7.
+One `workflow_dispatch`, four channels, one version. Full reasoning: [ADR-0005](./adr/0005-four-channels-one-artifact.md); the contract: [SPEC](../SPEC.md) §8.7.
 
 ```
 workflow_dispatch
@@ -82,7 +84,9 @@ workflow_dispatch
 
 **It is never triggered by a push to `main`.** With a no-override, network-dependent gate, automatic-on-merge releasing turns `main` red in any month the site is unreachable, and a red `main` nobody can act on is a gate everybody learns to ignore.
 
-`semantic-release` commits back `package.json`, `package-lock.json`, `src/version.ts`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. The two plugin files are in that list because `.mcp.json` pins the exact version it ships against.
+The publish step authenticates over **OIDC**, not with a token: the job carries `permissions: id-token: write`, runs npm CLI **≥ 11.5.1**, and gets **provenance by default** — no `--provenance` flag, and no `NPM_TOKEN` anywhere in the workflow or the repository's secrets.
+
+`semantic-release` commits back `package.json`, `package-lock.json`, `src/version.ts`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. The two plugin files are in that list because `.mcp.json` pins the exact version it ships against. It commits straight to `main`, which now carries a ruleset — pull request required, force-push and deletion blocked. **A pull-request-required rule refuses that push**, so the ruleset must name the identity the release job pushes as a bypass actor, scoped to it and to nothing else. If that cannot be scoped tightly enough, drop the pull-request rule rather than the other two: on a single-maintainer repository, force-push and deletion blocking are the halves actually protecting anything.
 
 **Nothing propagates.** The MCP Registry never polls npm, so a release that skips its step leaves the listing advertising the previous version indefinitely. Publishing to npm is not publishing.
 
@@ -91,18 +95,33 @@ workflow_dispatch
 1. **`vitest.config.ts` and the v2 SDK migration have landed.** Migrate first, publish once — there are no installed users yet, and MCPB has no update mechanism.
 2. **`"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` are in `package.json`.** npm version metadata is immutable: neither can be added or re-cased afterwards. `mcpName`'s casing is inferred from the registry's source rather than documented — the first publish attempt is where a 403 confirms it.
 3. **`.github/workflows/` exist** for PR checks and the dispatched release.
-4. **A granular npm token is in Actions secrets.** It cannot be scoped to a package that does not exist yet, so the first one is broader than it should be and is narrowed immediately after the first publish.
+4. **Trusted publishing is configured — which takes a placeholder publish first.** It is a per-package setting on npmjs.com and the settings page needs the package to exist, so the first artifact on npm cannot be the one CI publishes. In this order, from your own machine:
+
+   ```bash
+   npm publish                        # a stub 0.0.1 — license and mcpName already correct, they freeze here too
+   # then: npmjs.com/package/kleinanzeigen-mcp/access
+   #       → Trusted publisher → this repository + the release workflow
+   npm deprecate kleinanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
+   ```
+
+   npm publishes whatever version `package.json` carries, so that publish means setting `package.json` and `src/version.ts` to `0.0.1`, publishing, and **reverting both without committing** — `semantic-release` owns the version from the dispatch onwards, and `v0.1.0` in step 5 must still be a tag that was never published.
+
+   Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
+
+   **No npm token goes into Actions secrets, then or ever.** A granular token was the previous answer, from when a private repository made provenance impossible; granular write tokens now expire (7 days by default, 90 at the outside), which turns a credential used a few times a year into a rotation chore that fails while a release is being cut. Expect the first dispatch to need a workaround anyway: `@semantic-release/npm`'s OIDC path has [`#1069`](https://github.com/semantic-release/npm/issues/1069) and [`#1023`](https://github.com/semantic-release/npm/issues/1023) open against it. The bootstrap above already takes the first publish out of CI's hands, which is the sharper half of that exposure.
 5. **`git tag v0.1.0` on `main`.** With zero tags `semantic-release` reads *no previous release* and emits `1.0.0` — a stability promise this project cannot back. `v0.1.0` is simply true and was never published.
 6. **Dispatch.** The first version on npm is `0.2.0`, because the v2 migration is a `feat:`.
 
-### What is switched off while the repository is private
+### What the public repository turned on
 
-Recorded so nobody spends an afternoon debugging a thing that is not broken:
+The repository was private until shortly before the first release, and four things were switched off for as long as it was. All four work now, and none of them needed a workflow change — recorded here because half of the older notes in this repo were written against the other state:
 
-- **No npm provenance.** Retired for private sources in 2023. It starts working the day the repository opens, with no workflow change and no re-publish.
-- **`repository`, `homepage`, `bugs` and the User-Agent's `+https://…` URL all 404.** They stay unchanged; see ADR-0005 for why the User-Agent's identify half is the half that matters.
-- **The `.mcpb` is attached to every release and nobody outside can download it.** Built anyway: it costs one step and keeps the artefact provably in step with the npm tarball from the first release.
-- **The plugin marketplace resolves for the owner and for nobody else.** `npx` already satisfies "installable in one command"; the plugin is an extra channel.
+- **npm provenance**, through trusted publishing, on every published version.
+- **`repository`, `homepage`, `bugs` and the User-Agent's `+https://…` URL resolve.** They were never changed while they 404'd; see ADR-0005 for why the identify half of the User-Agent is the half the argument rests on either way.
+- **The `.mcpb` attached to every release is downloadable.** It was built and attached throughout regardless — it costs one step and keeps the artefact provably in step with the npm tarball from the first release.
+- **The plugin marketplace resolves for anyone**, not just its owner. `npx` already satisfied "installable in one command"; the plugin was, and stays, an extra channel.
+
+Visibility also makes rulesets available — GitHub Free offers them on public repositories and not on private ones — hence the one on `main` above. Required status checks join it once the PR checks exist; a ruleset requiring a check nothing produces blocks every merge.
 
 ### MCPB, four traps
 

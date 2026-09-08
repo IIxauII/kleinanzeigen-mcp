@@ -871,7 +871,7 @@ The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would m
 
 `prepublishOnly` would leave **`npm pack` still emitting the broken tarball** — and `npm pack` is what §8.6's cold-install verification and §8.7's MCPB staging both run. `prepare` would make the build install-time. So: **`"prepack": "npm run build"`**, which fixes both surfaces and keeps *`npm install` runs no code of ours* true. `tests/packaging.test.ts` carries a **positive assertion pinning `prepack`** alongside its existing negative lifecycle list — the install-time/publish-time distinction is a claim this project makes to users, so it is tested rather than merely true.
 
-**`minify` stays off.** `dist/index.js` therefore ships as 77 863 lines of readable JavaScript at ~44 bytes a line. That is a property of the artifact, not a claim the README makes — but while §8.7 has no provenance to offer, reading the bundle is the only inspection route a user has, and minifying would close it.
+**`minify` stays off.** `dist/index.js` therefore ships as 77 863 lines of readable JavaScript at ~44 bytes a line. That is a property of the artifact, not a claim the README makes — and it is not made redundant by §8.7's provenance, which attests that the bundle came from this source and says nothing about what the source does. Reading the bundle is the route from the artifact to the guards, and minifying would close it.
 
 ### 8.3 Transport and install
 
@@ -929,7 +929,9 @@ kleinanzeigen-mcp/<version> (+https://github.com/IIxauII/kleinanzeigen-mcp)
 
 Fixed in code, deliberately **not** an environment variable. Reasoning in [ADR-0003](./docs/adr/0003-non-circumvention.md).
 
-**Unchanged by publishing, and explicitly so.** The URL 404s while the repository is private (§8.7, [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md)), and it stays anyway. The token does two jobs and they separate cleanly: `kleinanzeigen-mcp/<version>` is what a site operator writes a block rule against — the **identify** half, which is the half ADR-0003's non-circumvention argument actually rests on — and the URL is the **explain** half, which is what a private repo costs. The URL is not wrong, it is early. Changing it would mean editing `src/user-agent.ts`, `src/fetch/core.test.ts`, this section and ADR-0003, and then editing them all back.
+**Unchanged by publishing, and now true in both halves.** The token does two jobs and they separate cleanly: `kleinanzeigen-mcp/<version>` is what a site operator writes a block rule against — the **identify** half, which is the half ADR-0003's non-circumvention argument actually rests on — and the `+https://…` URL is the **explain** half, which a private repository used to cost and which now resolves (§8.7, [ADR-0005](./docs/adr/0005-four-channels-one-artifact.md)). An operator who reads the token can read the project before deciding what to do about it, which was the whole point of putting a URL in a User-Agent.
+
+The split stays written down anyway, because it is what settles the question the next time the URL breaks — a rename, a move, a repository taken private again. The answer is that the token does not change: a block rule keys on the identify half, so a dead URL costs explanation and never enforcement, and chasing one would mean editing `src/user-agent.ts`, `src/fetch/core.test.ts`, this section and ADR-0003, and then editing them all back.
 
 `<version>` is `src/version.ts`, which is also `serverInfo.version` on every `initialize`. It is committed back by the release (§8.7) rather than left at a placeholder, and *the version is the provenance* (§7) lives on this wire.
 
@@ -941,7 +943,7 @@ Fixed in code, deliberately **not** an environment variable. Reasoning in [ADR-0
 
 - **hand-captured out of band** by a dev-time script — **never by the server**;
 - **minimised** to the DOM structure the parser actually reads;
-- **redacted** — seller names, exact locations, image URLs and free text scrubbed or replaced with synthetic values.
+- **redacted**, and the rule is *every* piece of personal or identifying data in the captured markup — scrubbed or replaced with synthetic values — rather than a list of fields. **Attributes the parser never reads are in scope.** The enumeration this bullet used to carry (seller names, exact locations, image URLs, free text) was a list of what the parser touches, and a redaction pass aimed at that list is how partner-ad ids in `data-gaevent` and shop names in `title="Zum shop …"` came to sit in committed fixtures — invisible for exactly as long as nobody read the markup the parser skips. The fixtures were re-redacted and the git history rewritten to remove the earlier copies, and **`tests/redaction.test.ts` pins the rule against the committed bytes** — every file under `tests/fixtures/`, not the ones a parser happens to load, matched on what a value looks like rather than on where anyone expected it. A capture that reintroduces one of these fails the suite instead of a review.
 
 Verbatim capture was rejected (it republishes real ads and real personal data under DSGVO); gitignored-only was rejected (CI and new contributors could not run parser tests); fully synthetic was rejected (the fixture drifts from the real DOM and the tests end up proving only that the parser parses the fixture).
 
@@ -972,7 +974,7 @@ It runs **on every PR and again as a pre-publish gate**: on a PR it catches pack
 
 ### 8.7 Release and distribution
 
-**One maintainer-triggered dispatch publishes one version to every channel.** Reasoning and the trade-offs accepted: [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md). The operational procedure: [`docs/maintenance.md`](./docs/maintenance.md).
+**One maintainer-triggered dispatch publishes one version to every channel.** Reasoning and the trade-offs accepted: [ADR-0005](./docs/adr/0005-four-channels-one-artifact.md). The operational procedure: [`docs/maintenance.md`](./docs/maintenance.md).
 
 ```
 workflow_dispatch
@@ -1007,6 +1009,15 @@ The split earns its keep: after a removal, an argument that resolved against the
 
 npm metadata is immutable; retrofitting either field is not a follow-up commit. The rest of the manifest — `description` (§4.6's one string), `homepage`, `repository`, `author: Felix (IIxauII)`, `bugs`, and `keywords: mcp, model-context-protocol, kleinanzeigen, classifieds, germany, read-only` — is mutable and merely absent today.
 
+**And one sequencing constraint of the same class points the other way: trusted publishing cannot be configured until the package exists.** It is a per-package setting on npmjs.com, and the settings page does not exist for a package that does not, so **the first artifact on npm cannot be the one CI publishes.** The resolution is a hand-published, immediately deprecated stub:
+
+1. `npm publish` a stub **`0.0.1`** from a maintainer's machine, with `license` and `mcpName` already correct — it is a real publish and they freeze on it too. npm publishes the version `package.json` carries, so `package.json` and `src/version.ts` go to `0.0.1` for that publish and are reverted uncommitted; `v0.1.0` stays a tag that was never published.
+2. Configure trusted publishing at `npmjs.com/package/kleinanzeigen-mcp/access`, pointing at this repository and the release workflow.
+3. `npm deprecate kleinanzeigen-mcp@0.0.1`, with a message saying it is a bootstrap placeholder.
+4. Dispatch. CI publishes **`0.2.0` with provenance**, and `latest` moves to it.
+
+This is recorded beside the immutable fields rather than filed in the procedure because it is the same kind of thing — a step whose wrong ordering costs a version number — and it is the only one that has to be taken **after** the first publish rather than before. Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`.
+
 **`server.json` for the MCP Registry** carries `$schema`, `name`, `title`, `description` (≤ 100 characters, schema-enforced), `version`, `repository`, `websiteUrl` and `packages[]`. npm and MCPB coexist in one `packages[]` entry. The MCPB entry needs a GitHub release-asset URL containing `mcp`, over https, with `fileSha256` **required** — and the registry does a redirect-refusing `HEAD` on it, so the asset must be uploaded before the registry step runs. The registry never verifies the hash; clients do, so a wrong hash publishes cleanly and fails every install. Listing is free, automated and unreviewed; there is no licence field, no category, and no disclosure form.
 
 **The MCPB artefact** is a plain zip extracted to disk at install time, so both sidecar datasets survive and `import.meta.url` resolves beside them. Claude Desktop supplies the Node runtime — nothing node-shaped goes in the zip — and the artefact measures ~1.07 MB. Four things about it are decided rather than incidental:
@@ -1020,9 +1031,11 @@ npm metadata is immutable; retrofitting either field is not a follow-up commit. 
 
 **MCPB has no update mechanism** — no update URL, no version check, nothing. A `.mcpb` on a GitHub release is inert: a new version means the user downloads and opens the file again. This is the channel on which "running a build they did not make and will never be prompted to replace" is most true, and §7's release gate is the whole of the mitigation.
 
-**The repository is private, so there is no provenance**, and the release does not pretend otherwise. npm retired provenance for private sources in 2023; it is a design limitation, not a configuration problem. Publishing uses a **granular npm token** in Actions secrets rather than OIDC, since trusted publishing's headline benefit is gone (the first token cannot be scoped to a package that does not exist yet, so it starts broader and is narrowed after the first publish). `repository`, `homepage`, `bugs` and §8.5's User-Agent URL all 404 for now and stay unchanged. The MCPB is built and attached to every release although nobody outside can download it — it costs one job step, keeps the `.mcpb` provably in step with the npm tarball from the first release, and switches on with no workflow change the day the repository opens. npm and the Registry are unaffected by the visibility: the package is public, and the `io.github.IIxauII` namespace authenticates against the account, not the repository.
+**Provenance is on, and no npm token exists.** Publishing goes through npm **trusted publishing** over OIDC: the publish job declares `id-token: write`, runs npm CLI **≥ 11.5.1**, and **emits provenance by default** — there is no `--provenance` flag to remember and none to lose in a later workflow edit. A **granular npm token in Actions secrets** was the earlier decision, taken when a private source repository made provenance impossible and OIDC's setup cost therefore bought nothing. It is retired on two facts: granular write tokens now **expire, 7 days by default and 90 at the outside**, which leaves a credential used a handful of times a year expired more often than valid and failing at the moment a release is being cut; and provenance — the thing the token path cannot produce without remembering a flag — is exactly what makes the OIDC setup worth paying for. **No npm token belongs in this repository's secrets at all**, not as a fallback and not to unblock a failing publish. Expect roughness on the way in: `@semantic-release/npm`'s OIDC path has open issues ([`#1069`](https://github.com/semantic-release/npm/issues/1069), `ENONPMTOKEN` on an OIDC-only setup; [`#1023`](https://github.com/semantic-release/npm/issues/1023), a first publish from a maintenance branch). The placeholder bootstrap above removes the first-publish half of that exposure and not the rest.
 
-**The README says nothing extra about unverifiability.** ADR-0005 records why.
+**The repository is public, so the four things that rode on visibility all work.** npm provenance, above. The `.mcpb` attached to every release is downloadable by anyone — it was built and attached regardless of that, because the step costs one job and keeps the artefact provably in step with the npm tarball from the first release. `repository`, `homepage`, `bugs` and §8.5's User-Agent URL resolve. And the plugin marketplace reaches past its owner (§8.8). npm and the Registry never depended on visibility either way: the package is public regardless, and the `io.github.IIxauII` namespace authenticates against the account, not the repository.
+
+**`main` takes a ruleset** — pull request required, force-push and deletion blocked — which GitHub Free does not offer on a private repository and does on a public one. Two things about it are decided rather than incidental. **Required status checks stay out of it until the PR checks exist**, because a ruleset that requires a check no workflow produces blocks every merge, including the one that would add the workflow. And **the release job needs a bypass**: `semantic-release` commits its version bump straight to `main`, which is exactly what a pull-request-required rule refuses, so the identity that job pushes as is named as a bypass actor and nothing else is. If that cannot be scoped tightly, the pull-request rule is the one to drop — on a single-maintainer repository, force-push and deletion blocking are the halves doing the protecting.
 
 ### 8.8 The Claude Code plugin and its skill
 
@@ -1076,7 +1089,9 @@ Form is these rules plus **one worked sequence** (place name → `find_location`
 
 **CI runs `claude plugin validate`** as a manifest check.
 
-**The plugin channel is owner-only until the repository goes public.** A marketplace resolves a plugin from a public git URL or from a path inside the marketplace repository, and this repository is private — so `/plugin marketplace add IIxauII/kleinanzeigen-mcp` works for its owner and for nobody else. Unlike npm, MCPB and the Registry, **this channel ships on the repository's visibility clock, not on the first release's**. Accepted knowingly: "installable in one command" is already satisfied by `npx`, and the plugin is an extra channel rather than the destination-critical one. Submission to `claude-plugins-community` is out of scope for the same reason, and because vendoring the plugin directory into their repository would put every update behind their review queue with no self-hosted channel to fall back on.
+**The plugin channel reaches everyone.** A marketplace resolves a plugin from a public git URL or from a path inside the marketplace repository, and this repository is public — so `/plugin marketplace add IIxauII/kleinanzeigen-mcp` works for anyone. It did not while the repository was private, and that was accepted rather than fixed: "installable in one command" is already satisfied by `npx`, and the plugin is an extra channel rather than the destination-critical one. The channel used to ship on the repository's visibility clock instead of the first release's; it no longer does, because visibility landed first.
+
+**Submission to `claude-plugins-community` stays out of scope**, on one of the two reasons it used to have. The other — that a marketplace needs a source the user can clone — is gone. What survives is the one that was doing the work: vendoring the plugin directory into their repository puts every change to the skill or to the pinned server version behind their review queue, with no self-hosted channel underneath to ship past it, and this repository's own `marketplace.json` already installs in one command.
 
 ---
 
@@ -1114,7 +1129,6 @@ Not decisions this spec dodged — questions nothing in it depends on. Each is c
 - **Whether `/pro/` and the Bestandsliste count the same things.** Limit 14 above.
 - **`searchScope`.** `BRANDING` behaved identically to `BOTH` and did not suppress the prose match; `ADS` was never sent. Hardcoding `BOTH` costs nothing given that.
 - **`shipping: false` × `buy_now: true`.** Should be another honest empty set, but that is an inference. It costs one request to learn and returns a correct answer either way.
-- **Whether the repository ever goes public.** Deferred past the first release rather than answered, and four things stay switched off meanwhile: npm provenance, a downloadable MCPB, the `+https://…` half of the User-Agent, and the plugin channel's reach beyond its owner (§8.7, §8.8, [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md)).
 - **Whether a real signing certificate is worth buying for MCPB.** Self-signing cannot verify, so today's artefact is unsigned and carries the warning (§8.7).
 
 ---
