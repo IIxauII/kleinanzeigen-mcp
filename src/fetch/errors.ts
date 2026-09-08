@@ -8,12 +8,16 @@ import type { FailureReason } from "../envelope.ts";
  * (SPEC 6.3).
  */
 export class FetchError extends Error {
-  constructor(
-    readonly reason: FailureReason,
-    message: string,
-  ) {
+  // Assigned in the body rather than declared as a constructor parameter
+  // property: the maintenance scripts import this module through
+  // `category-sitemap.ts` and Node runs them with **strip-only** type
+  // stripping, which refuses a parameter property outright (SPEC 7, 8.6).
+  readonly reason: FailureReason;
+
+  constructor(reason: FailureReason, message: string) {
     super(message);
     this.name = "FetchError";
+    this.reason = reason;
   }
 }
 
@@ -25,14 +29,21 @@ export class FetchError extends Error {
  * **A block is never constructed as retryable** (SPEC 5.4).
  */
 export class RequestFailure extends Error {
+  readonly reason: FailureReason;
+  readonly retryable: boolean;
+  readonly retryAfter: number | null;
+
   constructor(
-    readonly reason: FailureReason,
+    reason: FailureReason,
     message: string,
-    readonly retryable = false,
-    readonly retryAfter: number | null = null,
+    retryable = false,
+    retryAfter: number | null = null,
   ) {
     super(message);
     this.name = "RequestFailure";
+    this.reason = reason;
+    this.retryable = retryable;
+    this.retryAfter = retryAfter;
   }
 }
 

@@ -21,35 +21,16 @@ import {
   type CategorySitemapEntry,
 } from "../src/categories/category-sitemap.ts";
 import type { CategoryNode } from "../src/categories/category-tree.ts";
-import { USER_AGENT } from "../src/user-agent.ts";
+import { createGet, note, ORIGIN } from "./lib/site.ts";
 
-const ORIGIN = "https://www.kleinanzeigen.de";
 const OUTPUT = new URL("../data/category-tree.json", import.meta.url);
-
-/** Personal-scale politeness: serialised, no bursting (SPEC 2.8). */
-const REQUEST_GAP_MS = 1500;
 
 function fail(message: string): never {
   throw new Error(`category tree generation failed: ${message}`);
 }
 
-function note(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
-
-let lastRequestAt = 0;
-
-async function get(url: string): Promise<string> {
-  const wait = lastRequestAt + REQUEST_GAP_MS - Date.now();
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-  lastRequestAt = Date.now();
-
-  const response = await fetch(url, { headers: { "user-agent": USER_AGENT } });
-  if (!response.ok) fail(`GET ${url} answered ${response.status}`);
-  const body = await response.text();
-  note(`GET ${url} → ${response.status}, ${body.length} chars`);
-  return body;
-}
+/** Serialised at the shared 1500 ms gap, the same one the drift check holds (SPEC 2.8). */
+const get = createGet();
 
 /** Top-level ids in nav order, and every label the nav does render. */
 function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<number, string> } {
@@ -162,7 +143,11 @@ function reportDrift(nodes: CategoryNode[]): void {
   for (const node of renamed) note(`renamed: c${node.category_id} → ${node.name}`);
 }
 
-const nodes = await generate();
+// The shared `get` throws a bare `SiteError`; `fail` is what names this script
+// in every other message, so a failure reads the same wherever it came from.
+const nodes = await generate().catch((error: unknown) =>
+  fail(error instanceof Error ? error.message : String(error)),
+);
 const topLevelCount = nodes.filter((node) => node.parent_id === null).length;
 
 reportDrift(nodes);

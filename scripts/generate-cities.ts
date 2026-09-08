@@ -26,18 +26,12 @@
  * the 137 cities) and the entire postcode layer are absent from both sources
  * (SPEC 7).
  */
-import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import type { CityDatasetFile } from "../src/locations/city-dataset.ts";
-import { USER_AGENT } from "../src/user-agent.ts";
+import { readCitySitemap, readKatalog, slugFromName, type Place } from "./lib/locations.ts";
+import { CITIES_SITEMAP_URL, createGet, KATALOG_URL, note } from "./lib/site.ts";
 
-const ORIGIN = "https://www.kleinanzeigen.de";
-const SITEMAP_URL = `${ORIGIN}/sitemap_cities.xml`;
-const KATALOG_URL = `${ORIGIN}/s-katalog-orte.html`;
 const OUTPUT = new URL("../data/cities.json", import.meta.url);
-
-/** Personal-scale politeness: serialised, no bursting (SPEC 2.8). */
-const REQUEST_GAP_MS = 1500;
 
 /**
  * The three city-states, hard-coded as §7 requires. They are states *and*
@@ -47,93 +41,15 @@ const REQUEST_GAP_MS = 1500;
  */
 const CITY_STATES: Record<string, number> = { Berlin: 3331, Hamburg: 9409, Bremen: 1 };
 
-type Place = { id: number; name: string };
-
 function fail(message: string): never {
   throw new Error(`city dataset generation failed: ${message}`);
 }
 
-function note(message: string): void {
-  process.stderr.write(`${message}\n`);
-}
-
-let lastRequestAt = 0;
-
-async function get(url: string): Promise<string> {
-  const wait = lastRequestAt + REQUEST_GAP_MS - Date.now();
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-  lastRequestAt = Date.now();
-
-  const response = await fetch(url, { headers: { "user-agent": USER_AGENT } });
-  if (!response.ok) fail(`GET ${url} answered ${response.status}`);
-  const body = await response.text();
-  note(`GET ${url} → ${response.status}, ${body.length} chars`);
-  return body;
-}
-
-/**
- * The site's own slug spelling, as the `/stadt/` landing pages write it:
- * umlauts expanded the German way, everything else reduced to `a-z0-9-`.
- *
- * Only ever used for the 140 ids the sitemap withholds, and every derived slug
- * is checked back against a real landing page before it ships.
- */
-function slugFromName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/ä/gu, "ae")
-    .replace(/ö/gu, "oe")
-    .replace(/ü/gu, "ue")
-    .replace(/ß/gu, "ss")
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "");
-}
-
-/** `l<id>` → slug, plus the slugs of the id-less `/stadt/` landing pages. */
-function readSitemap(xml: string): { slugs: Map<number, string>; landingPages: Set<string> } {
-  const $ = cheerio.load(xml, { xml: true });
-  const slugs = new Map<number, string>();
-  const landingPages = new Set<string>();
-
-  for (const element of $("url > loc").toArray()) {
-    const loc = $(element).text().trim();
-    const path = loc.startsWith(ORIGIN) ? loc.slice(ORIGIN.length) : fail(`foreign entry ${loc}`);
-    const location = /^\/s-(.+)\/l(\d+)$/.exec(path);
-    const landing = /^\/stadt\/(.+)\/$/.exec(path);
-    if (location !== null) {
-      const id = Number(location[2]);
-      if (slugs.has(id)) fail(`the sitemap repeated l${id}`);
-      slugs.set(id, location[1]!);
-    } else if (landing !== null) {
-      landingPages.add(slugFromName(decodeURIComponent(landing[1]!)));
-    } else {
-      fail(`unrecognised sitemap entry ${loc}`);
-    }
-  }
-
-  if (slugs.size === 0) fail("the sitemap listed no locations");
-  return { slugs, landingPages };
-}
-
-/** The children of one catalogue node, in the page's own order. */
-function readKatalog(html: string, what: string): Place[] {
-  const $ = cheerio.load(html);
-  const places = $("#brwslctns-lctns-list a[href*='locationId=']")
-    .toArray()
-    .map((element) => {
-      const id = /[?&]locationId=(\d+)/.exec($(element).attr("href") ?? "")?.[1];
-      const name = $(element).text().replace(/\s+/gu, " ").trim();
-      if (id === undefined || name === "") fail(`unreadable ${what} entry in the catalogue`);
-      return { id: Number(id), name };
-    });
-  if (places.length === 0) fail(`the catalogue listed no ${what}`);
-  return places;
-}
+/** Serialised at the shared 1500 ms gap, the same one the drift check holds (SPEC 2.8). */
+const get = createGet();
 
 async function generate(): Promise<CityDatasetFile> {
-  const { slugs, landingPages } = readSitemap(await get(SITEMAP_URL));
+  const { slugs, landingPages } = readCitySitemap(await get(CITIES_SITEMAP_URL));
   note(`sitemap: ${slugs.size} ids with slugs, ${landingPages.size} id-less landing pages`);
 
   const states = readKatalog(await get(KATALOG_URL), "federal states");
@@ -230,7 +146,11 @@ function serialise(file: CityDatasetFile): string {
   return `{\n"states": [\n${rows(file.states)}\n],\n"locations": [\n${rows(file.locations)}\n]\n}\n`;
 }
 
-const file = await generate();
+// The shared readers throw a bare `SiteError`; `fail` is what names this script
+// in every other message, so a failure reads the same wherever it came from.
+const file = await generate().catch((error: unknown) =>
+  fail(error instanceof Error ? error.message : String(error)),
+);
 reportDrift(file);
 writeFileSync(OUTPUT, serialise(file), "utf8");
 note(
