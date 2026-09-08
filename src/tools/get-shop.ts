@@ -7,6 +7,7 @@ import { parseShopAds } from "../shop/parse-shop-ads.ts";
 import { parseShopPage } from "../shop/parse-shop-page.ts";
 import { GetShopArgsSchema, isFiltered, shopAdsRequest, shopPageUrl, type GetShopArgs } from "../shop/shop-request.ts";
 import { ShopRowSchema, ShopSchema } from "../shop/shop.ts";
+import { READS_LIVE_SITE } from "./annotations.ts";
 import { toolError, toolResult } from "./tool-result.ts";
 
 /** SPEC 4.3, verbatim. */
@@ -106,7 +107,12 @@ export function registerGetShop(server: McpServer): void {
   server.registerTool(
     "get_shop",
     {
+      // "and inventory" because the tool returns the profile *and* the
+      // seller's listings, and a title naming only the page undersells it
+      // (SPEC 4.3, 4.6).
+      title: "Get shop page and inventory",
       description: GET_SHOP_DESCRIPTION,
+      annotations: READS_LIVE_SITE,
       inputSchema: GetShopArgsSchema,
       outputSchema: OutputSchema,
     },

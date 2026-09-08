@@ -4,6 +4,7 @@ import { ENVELOPE_OUTPUT_SHAPE, localEnvelope } from "../envelope.ts";
 import { LocationNodeSchema, type CityDataset } from "../locations/city-dataset.ts";
 import { findLocations } from "../locations/find-locations.ts";
 import { log } from "../logging.ts";
+import { READS_BUNDLED_DATASET } from "./annotations.ts";
 import { toolResult } from "./tool-result.ts";
 
 /** SPEC 4.4, verbatim. */
@@ -43,7 +44,13 @@ const outputSchema = z.object({
 export function registerFindLocation(server: McpServer, readCityDataset: () => CityDataset): void {
   server.registerTool(
     "find_location",
-    { description: FIND_LOCATION_DESCRIPTION, inputSchema, outputSchema },
+    {
+      title: "Find locations",
+      description: FIND_LOCATION_DESCRIPTION,
+      annotations: READS_BUNDLED_DATASET,
+      inputSchema,
+      outputSchema,
+    },
     ({ query }) => {
       const matches = findLocations(readCityDataset(), query);
       // The envelope rides on every result, request or no request: `fetched_at`

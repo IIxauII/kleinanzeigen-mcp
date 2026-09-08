@@ -1,5 +1,7 @@
+import { Client, InMemoryTransport, type Tool } from "@modelcontextprotocol/client";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createServer } from "../server.ts";
 import { FIND_CATEGORY_DESCRIPTION } from "./find-category.ts";
 import { FIND_LOCATION_DESCRIPTION } from "./find-location.ts";
 import { FIND_SHOP_DESCRIPTION } from "./find-shop.ts";
@@ -60,5 +62,80 @@ describe("the tool descriptions", () => {
 
   it("are find_shop's from SPEC 4.5, verbatim", () => {
     expect(FIND_SHOP_DESCRIPTION).toBe(descriptionInSpec("4.5", "find_shop"));
+  });
+});
+
+/**
+ * §4.6 gives the annotations as a table, one row per tool, cell values in
+ * backticks and the two `false`s bolded. It is read from the spec for the same
+ * reason the descriptions are: annotations are wire-visible and agent-facing,
+ * so a spec edit the code does not follow fails here rather than passing.
+ */
+type SpecAnnotations = { title: string; readOnlyHint: boolean; openWorldHint: boolean };
+
+function annotationsInSpec(): Map<string, SpecAnnotations> {
+  const section = /### 4\.6 [^\n]*\n([\s\S]*?)\n---\n/u.exec(spec());
+  if (section === null) throw new Error("SPEC 4.6 no longer states what each tool declares");
+  const cell = (text: string): string => text.replaceAll("*", "").replaceAll("`", "").trim();
+  const rows = section[1]!.matchAll(/^\| `(\w+)` \|([^|]+)\|([^|]+)\|([^|]+)\|$/gmu);
+  const table = new Map<string, SpecAnnotations>();
+  for (const [, tool, title, readOnly, openWorld] of rows) {
+    table.set(tool!, {
+      title: cell(title!),
+      readOnlyHint: cell(readOnly!) === "true",
+      openWorldHint: cell(openWorld!) === "true",
+    });
+  }
+  if (table.size !== 6) throw new Error(`SPEC 4.6 no longer tables six tools, got ${table.size}`);
+  return table;
+}
+
+/** Over MCP, not off the registration call: what a client sees is the claim. */
+async function listedTools(): Promise<Tool[]> {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: "test-client", version: "0.0.0" });
+  await Promise.all([createServer().connect(serverTransport), client.connect(clientTransport)]);
+  return (await client.listTools()).tools;
+}
+
+describe("the tool annotations", () => {
+  it("state a title and both hints from SPEC 4.6, on every tool", async () => {
+    const tools = await listedTools();
+    const table = annotationsInSpec();
+    expect(tools.map((tool) => tool.name)).toEqual([...table.keys()]);
+    for (const [name, expected] of table) {
+      const tool = tools.find((candidate) => candidate.name === name)!;
+      expect({
+        title: tool.title,
+        readOnlyHint: tool.annotations?.readOnlyHint,
+        openWorldHint: tool.annotations?.openWorldHint,
+      }).toEqual(expected);
+    }
+  });
+
+  /**
+   * The protocol makes both meaningful only when `readOnlyHint` is false, so
+   * §4.6 omits them rather than defaulting them. Asserted positively, so
+   * re-adding either fails instead of passing quietly.
+   */
+  it("omit destructiveHint and idempotentHint entirely", async () => {
+    for (const tool of await listedTools()) {
+      expect(tool.annotations).not.toHaveProperty("destructiveHint");
+      expect(tool.annotations).not.toHaveProperty("idempotentHint");
+    }
+  });
+
+  /** One slot, one string: clients prefer `annotations.title`, so it stays empty (§4.6). */
+  it("carry the title in the top-level slot only, never annotations.title", async () => {
+    for (const tool of await listedTools()) {
+      expect(tool.annotations).not.toHaveProperty("title");
+    }
+  });
+
+  /** A data URI inflates every `tools/list` six times over, a remote one is a fetch (§4.6). */
+  it("ship no icons", async () => {
+    for (const tool of await listedTools()) {
+      expect(tool.icons).toBeUndefined();
+    }
   });
 });

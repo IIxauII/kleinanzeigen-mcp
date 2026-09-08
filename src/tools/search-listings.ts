@@ -15,6 +15,7 @@ import {
   SORTS,
   type SearchQuery,
 } from "../search/search-url.ts";
+import { READS_LIVE_SITE } from "./annotations.ts";
 import { toolError, toolResult } from "./tool-result.ts";
 
 /** SPEC 4.1, verbatim. */
@@ -106,7 +107,9 @@ export function registerSearchListings(server: McpServer, readCityDataset: () =>
   server.registerTool(
     "search_listings",
     {
+      title: "Search listings",
       description: SEARCH_LISTINGS_DESCRIPTION,
+      annotations: READS_LIVE_SITE,
       inputSchema: SearchQuerySchema,
       outputSchema: OutputSchema,
     },

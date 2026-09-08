@@ -6,6 +6,7 @@ import { GetListingArgsSchema, listingUrl, type GetListingArgs } from "../listin
 import { ListingSchema } from "../listing/listing.ts";
 import { parseListingPage } from "../listing/parse-listing-page.ts";
 import { log } from "../logging.ts";
+import { READS_LIVE_SITE } from "./annotations.ts";
 import { toolError, toolResult } from "./tool-result.ts";
 
 /** SPEC 4.2, verbatim. */
@@ -52,7 +53,9 @@ export function registerGetListing(server: McpServer): void {
   server.registerTool(
     "get_listing",
     {
+      title: "Get listing",
       description: GET_LISTING_DESCRIPTION,
+      annotations: READS_LIVE_SITE,
       inputSchema: GetListingArgsSchema,
       outputSchema: OutputSchema,
     },

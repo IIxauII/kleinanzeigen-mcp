@@ -12,6 +12,7 @@ import {
 } from "../shop/directory-request.ts";
 import { parseShopDirectory } from "../shop/parse-directory.ts";
 import { ShopCandidateSchema } from "../shop/shop.ts";
+import { READS_LIVE_SITE } from "./annotations.ts";
 import { toolError, toolResult } from "./tool-result.ts";
 
 /** SPEC 4.5, verbatim. */
@@ -66,7 +67,11 @@ export function registerFindShop(server: McpServer, readCategoryTree: () => Cate
   server.registerTool(
     "find_shop",
     {
+      title: "Find shops",
       description: FIND_SHOP_DESCRIPTION,
+      // The resolver that fetches, so its world is open despite the `find_`
+      // prefix the other two share (SPEC 4.6).
+      annotations: READS_LIVE_SITE,
       inputSchema: findShopArgsSchema(readCategoryTree),
       outputSchema: OutputSchema,
     },
