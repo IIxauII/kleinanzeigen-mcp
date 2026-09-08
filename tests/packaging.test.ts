@@ -1,11 +1,32 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterAll, describe, expect, it } from "vitest";
 
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
+const checkouts: string[] = [];
+afterAll(() => checkouts.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
+
+/** A copy of the tree as a fresh clone has it — no `dist/`, dependencies borrowed. */
+function freshCheckout(): string {
+  const dir = mkdtempSync(join(tmpdir(), "kleinanzeigen-pack-"));
+  checkouts.push(dir);
+  cpSync(ROOT, dir, {
+    recursive: true,
+    filter: (source) => !/(?:^|[/\\])(?:node_modules|\.git|\.claude|dist)$/.test(source),
+  });
+  symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"), "dir");
+  return dir;
+}
+
 /**
- * Run-from-clone, publish-ready by construction: if publishing is ever decided
- * it changes one README line and nothing in the code (SPEC 8.3).
+ * Publish-ready by construction: every field npm freezes on the first publish
+ * is asserted here, because none of them can be corrected by a commit
+ * afterwards (SPEC 8.1, 8.7).
  */
 describe("the package", () => {
   it("carries a bin entry pointing at the built bundle", () => {
@@ -15,29 +36,88 @@ describe("the package", () => {
 
   it("has no install-time lifecycle script at all", () => {
     // No `postinstall`, so an install runs no code of ours — which is half of
-    // why `npm install` here is inspectable (SPEC 8.3).
+    // why `npm install` here is inspectable (SPEC 8.3). `prepublish` stays on
+    // the list; it is not `prepublishOnly`, which npm still honours.
     for (const hook of ["preinstall", "install", "postinstall", "prepare", "prepublish"]) {
       expect(pkg.scripts, hook).not.toHaveProperty(hook);
     }
   });
 
-  it("depends on exactly the three runtime packages the spec names", () => {
-    expect(Object.keys(pkg.dependencies).sort()) //
-      .toEqual(["@modelcontextprotocol/server", "cheerio", "zod"]);
+  it("builds on `prepack`, so a pack from a clean checkout is not empty", () => {
+    // `dist/` is gitignored: without this hook `files: ["dist"]` packs only
+    // because a built `dist` happens to exist locally. `prepack` covers both
+    // `npm pack` and `npm publish` and leaves install time untouched — the
+    // install-time/publish-time split is a claim this project makes to users,
+    // so it is tested rather than merely true (SPEC 8.2).
+    expect(pkg.scripts.prepack).toBe("npm run build");
   });
 
-  it("pulls in no native runtime dependency: nothing shipped builds at install time", () => {
-    // A native dependency would need a compiler on the operator's machine and
-    // would make the bundle un-portable. Only what ships counts: the build and
-    // test toolchain is a maintainer's problem, and `files` carries `dist`
-    // alone (SPEC 8.1, 8.3).
-    const tree = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
-    const native = Object.entries<Record<string, unknown>>(tree.packages ?? {})
-      .filter(([, entry]) => entry.hasInstallScript === true)
-      .filter(([, entry]) => entry.dev !== true && entry.devOptional !== true)
-      .map(([path]) => path);
-    expect(native).toEqual([]);
+  it("declares no runtime dependencies: the bundle inlines all three", () => {
+    // `noExternal: [/.*/]` puts @modelcontextprotocol/server, cheerio and zod
+    // inside dist/index.js, so declaring them cost every `npx` cold start 110
+    // packages and 33 MB for code already in the tarball. They move to
+    // devDependencies rather than out of the tree: the build still needs all
+    // three. Their absence from `dependencies` is safe only once §8.6's
+    // cold-install verification proves the installed bundle resolves nothing
+    // at runtime, and the two decisions move together (SPEC 8.1, 8.6).
+    expect(pkg).not.toHaveProperty("dependencies");
+    expect(Object.keys(pkg.devDependencies)).toEqual(
+      expect.arrayContaining(["@modelcontextprotocol/server", "cheerio", "zod"]),
+    );
   });
+
+  it("carries the two fields npm freezes on the first publish", () => {
+    // Immutable once published: neither can be added nor re-cased afterwards,
+    // and `mcpName`'s casing is inferred from the registry's source — it
+    // formats `io.github.%s/*` from the GitHub login verbatim, with no case
+    // folding anywhere in the match (SPEC 8.7).
+    expect(pkg.license).toBe("Unlicense");
+    expect(pkg.mcpName).toBe("io.github.IIxauII/kleinanzeigen");
+  });
+
+  it("ships the licence text the `license` field names", () => {
+    expect(existsSync(new URL("../LICENSE", import.meta.url))).toBe(true);
+  });
+
+  it("carries the registry metadata, description byte-identical to the shared string", () => {
+    // `description` is the one string every other manifest repeats — the SDK
+    // `Implementation`, server.json, the MCPB manifest and plugin.json, as
+    // each of those lands. Never paraphrased (SPEC 8.7).
+    expect(pkg.description).toBe("A read-only, robots-clean MCP server over kleinanzeigen.de");
+    expect(pkg.homepage).toBe("https://github.com/IIxauII/kleinanzeigen-mcp");
+    expect(pkg.repository).toBe("https://github.com/IIxauII/kleinanzeigen-mcp");
+    expect(pkg.bugs).toBe("https://github.com/IIxauII/kleinanzeigen-mcp/issues");
+    expect(pkg.author).toBe("Felix (IIxauII)");
+  });
+
+  it("packs the bundle, its two datasets and the licence, and nothing else", () => {
+    // On the tarball rather than on the lockfile: with no runtime dependency
+    // left to declare, a lockfile scan for install scripts is vacuous. What
+    // ships is what counts, and the whole file list is asserted rather than a
+    // filter over it — a `node_modules/` or `.node` filter under `files:
+    // ["dist"]` is a check that cannot fail (SPEC 8.1, 8.2).
+    //
+    // Packed from a copy with no `dist/`, which is both the honest test — this
+    // is the fresh-clone case `prepack` exists for — and what keeps
+    // `prepack`'s `clean: true` from deleting `dist/index.js` underneath the
+    // stdio tests spawning it in a parallel worker.
+    const out = execFileSync("npm", ["pack", "--dry-run", "--json"], { cwd: freshCheckout(), encoding: "utf8" });
+    // `prepack` runs the build, and tsup's own log shares this stdout — the
+    // report is the JSON array that starts on a line of its own after it.
+    const start = out.search(/^\[$/m);
+    expect(start, `no JSON report in \`npm pack\` output:\n${out}`).toBeGreaterThanOrEqual(0);
+    const packed = JSON.parse(out.slice(start));
+    const paths: string[] = packed[0].files.map((file: { path: string }) => file.path);
+
+    expect(paths.sort()).toEqual([
+      "LICENSE",
+      "README.md",
+      "dist/category-tree.json",
+      "dist/cities.json",
+      "dist/index.js",
+      "package.json",
+    ]);
+  }, 120_000);
 
   it("names Node 22 as the floor, which is what makes the timezone work free", () => {
     expect(pkg.engines.node).toBe(">=22");
