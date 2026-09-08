@@ -2,9 +2,9 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createServer } from "./server.ts";
+import { specSection } from "./spec-section.ts";
 import { VERSION } from "./version.ts";
 
-const SPEC = new URL("../SPEC.md", import.meta.url);
 const PACKAGE = new URL("../package.json", import.meta.url);
 
 /**
@@ -13,17 +13,20 @@ const PACKAGE = new URL("../package.json", import.meta.url);
  * fields whose absence left a client listing installed servers showing the
  * bare slug, so they are pinned to the spec rather than to a copy of it.
  */
-function identityInSpec(): Record<string, string> {
-  const section = /### 4\.6 [^\n]*\n([\s\S]*?)\n---\n/u.exec(readFileSync(SPEC, "utf8"));
-  if (section === null) throw new Error("SPEC 4.6 no longer states what each tool declares");
-  const block = /```ts\n\{\n([\s\S]*?)\n\}\n```/u.exec(section[1]!);
+type SpecIdentity = { name: string; title: string; description: string; websiteUrl: string };
+
+function identityInSpec(): SpecIdentity {
+  const block = /```ts\n\{\n([\s\S]*?)\n\}\n```/u.exec(specSection("4.6"));
   if (block === null) throw new Error("SPEC 4.6 no longer gives the server Implementation");
   const fields = Object.fromEntries(
     [...block[1]!.matchAll(/^ {2}(\w+): "([^"]*)",$/gmu)].map(([, key, value]) => [key!, value!]),
   );
-  // `version: VERSION` is the one unquoted field, so it is absent by design.
-  if (fields.title === undefined) throw new Error("SPEC 4.6 no longer names the server's title");
-  return fields;
+  // `version: VERSION` is the one unquoted field, so it is absent by design;
+  // every other one is named here, so a spec that drops one fails loudly.
+  for (const field of ["name", "title", "description", "websiteUrl"]) {
+    if (fields[field] === undefined) throw new Error(`SPEC 4.6 no longer gives the server's ${field}`);
+  }
+  return fields as SpecIdentity;
 }
 
 async function serverIdentity() {

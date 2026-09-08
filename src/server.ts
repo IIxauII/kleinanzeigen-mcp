@@ -40,10 +40,7 @@ export function createServer({
       // `server.json`, the MCPB manifest and `plugin.json` (SPEC 4.6, 8.7).
       description: "A read-only, robots-clean MCP server over kleinanzeigen.de",
       websiteUrl: "https://github.com/IIxauII/kleinanzeigen-mcp",
-      // No `icons`, here or on any tool: a data URI inflates every
-      // `tools/list`, a remote URL is a fetch this server has no business
-      // making, and the site's own logo would imply the endorsement ADR-0003
-      // exists to avoid claiming (SPEC 4.6).
+      // No `icons`, here or on any tool — SPEC 4.6 gives the three reasons.
     },
     { capabilities: { tools: {} } },
   );

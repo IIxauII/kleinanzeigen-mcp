@@ -1,7 +1,7 @@
 import { Client, InMemoryTransport, type Tool } from "@modelcontextprotocol/client";
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createServer } from "../server.ts";
+import { spec, specSection } from "../spec-section.ts";
 import { FIND_CATEGORY_DESCRIPTION } from "./find-category.ts";
 import { FIND_LOCATION_DESCRIPTION } from "./find-location.ts";
 import { FIND_SHOP_DESCRIPTION } from "./find-shop.ts";
@@ -9,9 +9,8 @@ import { GET_LISTING_DESCRIPTION } from "./get-listing.ts";
 import { GET_SHOP_DESCRIPTION } from "./get-shop.ts";
 import { SEARCH_LISTINGS_DESCRIPTION } from "./search-listings.ts";
 
-const SPEC = new URL("../../SPEC.md", import.meta.url);
-
-const spec = (): string => readFileSync(SPEC, "utf8");
+// `spec()` is the whole file: §4.1–§4.5 are matched across sections, while the
+// §4.6 pins below take the one section through `specSection`.
 
 /**
  * A tool description is the whole of what an agent reads before choosing a
@@ -74,10 +73,8 @@ describe("the tool descriptions", () => {
 type SpecAnnotations = { title: string; readOnlyHint: boolean; openWorldHint: boolean };
 
 function annotationsInSpec(): Map<string, SpecAnnotations> {
-  const section = /### 4\.6 [^\n]*\n([\s\S]*?)\n---\n/u.exec(spec());
-  if (section === null) throw new Error("SPEC 4.6 no longer states what each tool declares");
   const cell = (text: string): string => text.replaceAll("*", "").replaceAll("`", "").trim();
-  const rows = section[1]!.matchAll(/^\| `(\w+)` \|([^|]+)\|([^|]+)\|([^|]+)\|$/gmu);
+  const rows = specSection("4.6").matchAll(/^\| `(\w+)` \|([^|]+)\|([^|]+)\|([^|]+)\|$/gmu);
   const table = new Map<string, SpecAnnotations>();
   for (const [, tool, title, readOnly, openWorld] of rows) {
     table.set(tool!, {
@@ -102,7 +99,9 @@ describe("the tool annotations", () => {
   it("state a title and both hints from SPEC 4.6, on every tool", async () => {
     const tools = await listedTools();
     const table = annotationsInSpec();
-    expect(tools.map((tool) => tool.name)).toEqual([...table.keys()]);
+    // The set, not the order: which six tools the table covers is the claim,
+    // and registration order is already pinned by `tests/stdio-server.test.ts`.
+    expect(tools.map((tool) => tool.name).sort()).toEqual([...table.keys()].sort());
     for (const [name, expected] of table) {
       const tool = tools.find((candidate) => candidate.name === name)!;
       expect({
@@ -114,25 +113,22 @@ describe("the tool annotations", () => {
   });
 
   /**
-   * The protocol makes both meaningful only when `readOnlyHint` is false, so
-   * §4.6 omits them rather than defaulting them. Asserted positively, so
-   * re-adding either fails instead of passing quietly.
+   * The whole key set in one assertion, so presence and omission are pinned
+   * together and neither can pass vacuously:
+   *
+   * - `destructiveHint` and `idempotentHint` are meaningful to the protocol
+   *   only when `readOnlyHint` is false, so §4.6 omits rather than defaults
+   *   them — re-adding either fails here;
+   * - `annotations.title` stays empty because clients prefer it over the
+   *   top-level slot, and two slots invite two strings that drift.
    */
-  it("omit destructiveHint and idempotentHint entirely", async () => {
+  it("carry those two hints and nothing else — no omitted hint, no annotations.title", async () => {
     for (const tool of await listedTools()) {
-      expect(tool.annotations).not.toHaveProperty("destructiveHint");
-      expect(tool.annotations).not.toHaveProperty("idempotentHint");
+      expect(Object.keys(tool.annotations ?? {}).sort()).toEqual(["openWorldHint", "readOnlyHint"]);
     }
   });
 
-  /** One slot, one string: clients prefer `annotations.title`, so it stays empty (§4.6). */
-  it("carry the title in the top-level slot only, never annotations.title", async () => {
-    for (const tool of await listedTools()) {
-      expect(tool.annotations).not.toHaveProperty("title");
-    }
-  });
-
-  /** A data URI inflates every `tools/list` six times over, a remote one is a fetch (§4.6). */
+  /** §4.6 ships none, on a tool or on the server. */
   it("ship no icons", async () => {
     for (const tool of await listedTools()) {
       expect(tool.icons).toBeUndefined();
