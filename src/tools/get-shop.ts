@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ENVELOPE_OUTPUT_SHAPE } from "../envelope.ts";
 import { getFetchCore } from "../fetch/core.ts";
@@ -108,7 +108,7 @@ export function registerGetShop(server: McpServer): void {
     {
       description: GET_SHOP_DESCRIPTION,
       inputSchema: GetShopArgsSchema,
-      outputSchema: OutputSchema.shape,
+      outputSchema: OutputSchema,
     },
     async (args: GetShopArgs) => {
       const page = args.page ?? 1;

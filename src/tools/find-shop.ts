@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import type { CategoryTree } from "../categories/category-tree.ts";
 import { ENVELOPE_OUTPUT_SHAPE } from "../envelope.ts";
@@ -68,7 +68,7 @@ export function registerFindShop(server: McpServer, readCategoryTree: () => Cate
     {
       description: FIND_SHOP_DESCRIPTION,
       inputSchema: findShopArgsSchema(readCategoryTree),
-      outputSchema: OutputSchema.shape,
+      outputSchema: OutputSchema,
     },
     async (args: FindShopArgs) => {
       const request = directoryRequest(args);
