@@ -34,7 +34,11 @@ The middle ground is the decision: retain as little as possible for as short as 
 
 ## The two things that touch the filesystem, and why they don't count
 
-**The bundled category tree and city dataset** ship inside the package as build-time artefacts and are read lazily on first use. Static reference data shipped with the package is not persistence; listing data is, and none of that touches disk. The drift check **reads and reports; it writes nothing** — drift is fixed by shipping a new version, not by a runtime write.
+**The bundled category tree and city dataset** ship inside the package as build-time artefacts and are read lazily on first use — never at startup. Static reference data shipped with the package is not persistence; listing data is, and none of that touches disk.
+
+The drift check used to be named here as a third thing the server does that does not count. **It is no longer in the server at all.** It moved to `scripts/check-drift.ts`, the shipped binary takes no arguments, and the check is run by a maintainer's clone and by a monthly CI cron ([SPEC](../../SPEC.md) §7, [ADR-0005](./0005-four-channels-one-artifact-no-provenance.md)). The old sentence was true — it read and reported and wrote nothing — but it is now answering a question about code this server does not contain. Drift is still fixed the same way: by regenerating the dataset and shipping a new version, never by a runtime write.
+
+A **startup** drift check is refused twice over, and the refusal belongs here because it is the thing a reader will propose. It is work the user did not ask for, done on their machine and their IP; and it breaks §7's read-lazily-on-first-use rule, which is what makes a keyword-only search touch neither dataset.
 
 **Test fixtures are committed** — which is the same § 87b question moved from runtime into source control, plus live personal data in a public repository under DSGVO. They are therefore **hand-captured out of band by a dev-time script (never by the server), minimised to the DOM the parser actually reads, and redacted** of seller names, exact locations, image URLs and free text.
 

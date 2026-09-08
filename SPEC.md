@@ -579,6 +579,49 @@ unlike the other resolvers. A match may be a mention in a shop's profile
 text rather than its name, so check before using one.
 ```
 
+### 4.6 What each tool declares
+
+**Two annotation fields are stated on every tool, two are deliberately absent, and no icon ships anywhere.** Annotations are wire-visible and agent-facing in exactly the way descriptions are, so they are pinned here and tested rather than left to a reviewer's checklist.
+
+| tool | `title` | `readOnlyHint` | `openWorldHint` |
+| --- | --- | --- | --- |
+| `search_listings` | Search listings | `true` | `true` |
+| `get_listing` | Get listing | `true` | `true` |
+| `get_shop` | Get shop page and inventory | `true` | `true` |
+| `find_category` | Find categories | `true` | **`false`** |
+| `find_location` | Find locations | `true` | **`false`** |
+| `find_shop` | Find shops | `true` | `true` |
+
+**`readOnlyHint: true` is stated on all six, never left to the default.** The default is `false`, so silence here asserts the *opposite* of the whole project — read-only is the first line of the README, it is ADR-0001 and ADR-0003, and it is what the §12 position rests on. Asserting it in prose and nowhere on the wire is the defect this table fixes. `get_shop`'s `POST …brandProfile.getAds` does not complicate the claim: it is a transport verb, not a mutation, and the field asks whether the tool modifies its environment.
+
+**`openWorldHint` is the field that splits the surface.** It is not "does it touch the network" — it asks whether the set of things the tool can reach is bounded and knowable in advance. The two dataset resolvers walk a snapshot frozen into the tarball at build time, at **zero requests** (§4.4), which is a closed world in the field's own sense; the other four read a live site whose contents move underneath the caller. `find_shop` fetches, so it is open despite the `find_` prefix. The default is `true`, so leaving it unset would advertise both resolvers as reaching an open world while they read a file on disk.
+
+**`destructiveHint` and `idempotentHint` are omitted, not defaulted, and that is not an oversight.** The protocol makes both meaningful *only when `readOnlyHint == false`*, so with `readOnlyHint: true` everywhere neither field has anything to carry. `destructiveHint: false` would be noise that also implies the author thought `readOnlyHint` might be false. `idempotentHint: true` on a fetching tool would be worse than noise: a reader would take it as a claim about **result stability**, which is exactly what *Drift* (§2.7, §9.3) denies and what the envelope reports honestly instead. The test asserts both fields are **absent**, so re-adding them fails rather than passes quietly.
+
+**`title` goes in the top-level slot only, never `annotations.title`.** Both exist and clients are told to prefer the annotation, so populating both invites two strings that drift with the wrong one winning. One slot, one string. The titles are plain verb phrases; `get_shop` carries "and inventory" because the tool returns the profile *and* the seller's listings (§4.3), and a title naming only the page undersells it. The resolvers' "candidates, never a selection" identity stays in the descriptions, where it already lives.
+
+**No icons, on any tool or on the server.** Three reasons, any one sufficient: a data URI inflates *every* `tools/list` six times over; a remote URL is a fetch this stdio-only, rate-limited server has no business making; and the only obvious icon is kleinanzeigen's own logo, which would imply the endorsement ADR-0003 exists to avoid claiming.
+
+**Server identity is declared in the same pass.** The SDK's `Implementation` takes `title`, `description`, `websiteUrl` and `icons`, and passing `{ name, version }` alone leaves a client listing installed servers showing the bare slug:
+
+```ts
+{
+  name: "kleinanzeigen-mcp",
+  version: VERSION,
+  title: "kanzeigen",
+  description: "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  websiteUrl: "https://github.com/IIxauII/kleinanzeigen-mcp",
+}
+```
+
+**`title` is `kanzeigen`, verbatim and lowercase** — the clipped stem, chosen over `Kleinanzeigen (unofficial, read-only)` and over matching the `claude mcp add kleinanzeigen` install handle, to put distance between this project's display name and the site's trademark. It states neither *read-only* nor *unofficial*; the description and the README carry those. **The clip governs every slug the project owns downstream**, including the plugin's (§8.8).
+
+**`description` is one string, reused in five places** — `package.json`, this `Implementation`, `server.json`, the MCPB manifest and `plugin.json` (§8.7, §8.8). One sentence to keep true rather than five to keep in step. At 57 characters it clears the MCP Registry's 100-character cap with room to spare.
+
+**Pinned by `descriptions.test.ts`.** That test already asserts every tool description matches this spec verbatim, on the reasoning that a description is the whole of what an agent reads before choosing a tool. It is extended to pin each tool's `title`, `readOnlyHint` and `openWorldHint` against the table above, and to assert `destructiveHint` and `idempotentHint` are absent.
+
+**None of this waits on the v2 migration.** `title`, `annotations` and `icons` are in the v1 SDK already and the codemod does not touch them; the sequencing in §8.7 is a release-ordering decision, not a dependency.
+
 ---
 
 ## 5. Fetch and parse
@@ -772,7 +815,22 @@ Reading is not writing; ADR-0002's invariant is untouched.
 
 **A location id implies its whole subtree** — verified across Berlin, Schleswig-Holstein and Kr. München. No searching each district separately.
 
-**Drift check.** An opportunistic, explicitly-invoked check fetches only `sitemap_categories.xml` (1 request, 2 KB) and diffs the id set against the bundle. Empty diff → done. Non-empty → **warn on stderr and point a maintainer at the rebuild**. It **reads and reports; it writes nothing** — drift is fixed by shipping a new version, not by a runtime write. Do **not** run it on every call, and do **not** condition it on the sitemap index's `lastmod`, which is a whole-index regeneration timestamp rather than a taxonomy-change signal.
+**Drift check.** One check covers **both** datasets at full depth — **19 requests**: `sitemap_categories.xml`, `sitemap_cities.xml`, and the 16 `/s-katalog-orte.html` state pages — serialised at the generators' 1500 ms gap, ~28 s per run. It **reads and reports; it writes nothing**: drift is fixed by regenerating the dataset and shipping a new version, never by a runtime write. Do **not** condition it on the sitemap index's `lastmod`, which is a whole-index regeneration timestamp rather than a taxonomy-change signal.
+
+Four things about it are decisions, not implementation detail:
+
+- **It lives in `scripts/`, not in the shipped binary.** `npm run check:drift` is `node scripts/check-drift.ts`, beside the two generators whose fetch code it shares. §8.3's argv contract follows from this: the binary takes no arguments. The cost is stated rather than hidden — **a published user cannot check their own bundle** (§9.17). The cron has a clone; a user does not need one.
+- **It does not route through `src/fetch/core.ts`'s limiter.** The 1500 ms gap is the project's stance, not a performance setting, and an operator's `KLEINANZEIGEN_MCP_RATE_LIMIT_MS` (§8.4) must never retune a maintenance job.
+- **The cheap id-only variant was offered and refused.** `sitemap_cities.xml` carries ids but **no names**, so a sitemap-only diff is blind to renames; the katalog walk catches them ([ADR-0004](./docs/adr/0004-the-city-dataset-has-two-sources.md)). This retires the *"one request, 2 KB"* posture twice over — the check is 19 requests, and the categories sitemap measures **11 940 B**, not ~2 KB.
+- **The status is not the test.** A block presents as HTTP 200 with an empty list (ADR-0003), so every leg counts a parse marker (`<loc>…/c<id>`, `locationId=`) and fails on a 200 that carries none.
+
+**Exit codes: `2` outranks `1` outranks `0`.** `0` clean, `1` real drift, `2` the check never reached the site. The stderr report **always names each dataset's outcome separately**, and issue-opening is driven by the *report*, not the process exit — so a dataset at `1` opens an issue even when the other dataset's outage pushed the exit to `2`. Real drift is never swallowed by the other half's failure.
+
+**Who runs it, and when it blocks.** A monthly GitHub Actions cron diffs the repo's `data/` against the live sources; `1` opens or updates a single tracking issue, `2` logs only — a check that never reached the site has learnt nothing, and an issue would claim otherwise. **The same check gates every release, blocking on `1` and on `2`, with no override** (§8.7). That clause is load-bearing: it is the only reason *the version is the provenance* is true. If no release ships without establishing dataset currency, the publish date **is** the dataset-current date, and neither dataset needs a `generated_at` stamp. Weaken the gate and the provenance claim goes with it. The cron targets the repo's `data/`, not a published tarball — one code path, one meaning of "checked"; users are stale iff a release is overdue.
+
+A GitHub Actions runner **is** served by the site: three runs from `ubuntu-latest` on three distinct Azure IPs returned HTTP 200 with no redirect, no `Retry-After` and no interstitial, on both gateway routes the check touches (`sitemaps` for the sitemap leg, `k-desktop` for the 17 katalog requests). ADR-0003 was never put to the test, because there was no block to route around. What is **not** established is durability — three runs inside three minutes, and Azure ranges are exactly what a future tightening would target. The cron's own exit status is the monitor for this answer expiring: a check that starts failing on the network leg rather than on real drift is the signal.
+
+The live category set was **159 as of 2026-09-08**, byte-for-byte the count in `data/category-tree.json`. The check is cheap in requests but not in bytes — one katalog state page is 583 KB and the root 137 KB, so a full run is multi-megabyte. Irrelevant to a monthly cron; worth knowing before anyone proposes running it per-PR.
 
 **The shop directory is deliberately not bundled**, on four independent grounds: `liveAds` is a live inventory count a snapshot would freeze; the ordering reseeds nightly (`randomizationSeed` is the date); `totalHits` drifted 53 811 → 53 808 inside 30 minutes; and the sweep is 1 077 requests ≈ 27 minutes.
 
@@ -780,30 +838,65 @@ Reading is not writing; ADR-0002's invariant is untouched.
 
 ## 8. Stack, packaging, install
 
-**TypeScript on Node ≥ 22, three runtime dependencies, stdio, run-from-clone, one env knob.**
+**TypeScript on Node ≥ 22, three build-time dependencies inlined into one file, stdio, four install channels, one env knob.**
 
 ### 8.1 Language and dependencies
 
 - **TypeScript**, chosen for the **domain model, not the runtime**: the price tagged union (§3.1) and the listing flags (§3.4) get compile-time exhaustiveness on every `switch`. Since the whole point of the price union is that "negotiable with no number" can never be read as "free", having the compiler enforce it beats having a test enforce it.
 - **Node ≥ 22.** Node 20 went EOL in April 2026; 22 is in maintenance, 24 is active LTS. 22 keeps the door open for anyone not yet on 24. Node 22 also ships full ICU, which is what makes §3.2's `Europe/Berlin` normalisation free.
-- **Three runtime dependencies: `@modelcontextprotocol/sdk`, `zod`, `cheerio`.** `zod` is not new — the SDK already requires it for tool schemas. `cheerio` earns its place because §5.8 makes parse failure a loud, breaker-adjacent event, and hand-rolled regex extraction would be the most brittle thing to hang that rule on; every anchor in §5.1 is a plain CSS selector.
+- **Three build-time dependencies, inlined: `@modelcontextprotocol/server`, `zod`, `cheerio`.** `zod` is not new — the SDK already requires it for tool schemas. `cheerio` earns its place because §5.8 makes parse failure a loud, breaker-adjacent event, and hand-rolled regex extraction would be the most brittle thing to hang that rule on; every anchor in §5.1 is a plain CSS selector.
+- **The published package declares no `dependencies` at all**, and this is the correction of a real defect rather than a tidy-up. §8.2's `noExternal: [/.*/]` already inlines all three into the bundle, yet the manifest declared them — so every `npx -y kleinanzeigen-mcp` cold start downloaded **110 packages, 4 750 files, 33 MB** for code already sitting in the 3.4 MB tarball. Ten times the artifact, for nothing, on the primary install channel. All three are `devDependencies`. **This is safe only because §8.6's cold-install verification proves the installed bundle resolves nothing at runtime**; the two decisions are load-bearing on each other, and neither may be removed alone.
+- **`@modelcontextprotocol/client` is test-only.** It is imported by the in-process handshake tests and by nothing under `src/`. It belongs in `devDependencies` for that reason, independently of the inlining above.
 - **No HTTP client dependency.** Node's built-in `fetch` suffices: blocking is IP-reputation and volume driven, not request-shape driven, so finer header or HTTP/2 control buys nothing.
 
-For contrast, five of the seven existing kleinanzeigen MCP servers depend on a ~1.5 GB Playwright container. This is three packages and a file read.
+For contrast, five of the seven existing kleinanzeigen MCP servers depend on a ~1.5 GB Playwright container. What a user installs here is **one file, two sidecar datasets, and nothing to resolve**.
 
 ### 8.2 Build
 
-**tsup → a single-file ESM `dist/index.js`, dependencies inlined. `tsc --noEmit` is the real typecheck.**
+**tsup → a single-file ESM `dist/index.js`, dependencies inlined, built by `prepack`. `tsc --noEmit` is the real typecheck.**
 
 Node ≥ 22.18 strips TypeScript types natively, which would allow pointing the MCP config straight at `src/index.ts`. Rejected: run-from-clone already requires `npm install`, so no-build saves exactly one `npm run build`, and **type-stripping does not typecheck — it deletes annotations**. A bundle also makes cold start a single file read instead of a `node_modules` resolution walk.
 
-The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would mean JS-parsing 11 091 locations on every process start, and sidecar files stay diffable for the drift check.
+The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would mean JS-parsing 11 231 locations on every process start, and sidecar files stay diffable for the drift check (§7). They survive MCPB packing untouched, and `import.meta.url` still resolves beside them after an extension is extracted to disk (§8.7).
+
+**`prepack` is the build gate, and the hook was chosen by measurement.** `dist/` is gitignored, so `files: ["dist"]` packs only because a built `dist` happens to exist locally — from a fresh clone the tarball is `README.md` + `package.json` and `bin` points at nothing. Measured against npm 11.12.1:
+
+| | `prepack` | `prepublishOnly` | `prepare` |
+| --- | --- | --- | --- |
+| `npm pack` | ✅ | — | ✅ |
+| `npm publish` | ✅ | ✅ | ✅ |
+| `npm install` (in a clone) | — | — | ✅ |
+| `npm ci` | — | — | ✅ |
+| consumer install | — | — | — |
+
+`prepublishOnly` would leave **`npm pack` still emitting the broken tarball** — and `npm pack` is what §8.6's cold-install verification and §8.7's MCPB staging both run. `prepare` would make the build install-time. So: **`"prepack": "npm run build"`**, which fixes both surfaces and keeps *`npm install` runs no code of ours* true. `tests/packaging.test.ts` carries a **positive assertion pinning `prepack`** alongside its existing negative lifecycle list — the install-time/publish-time distinction is a claim this project makes to users, so it is tested rather than merely true.
+
+**`minify` stays off.** `dist/index.js` therefore ships as 77 863 lines of readable JavaScript at ~44 bytes a line. That is a property of the artifact, not a claim the README makes — but while §8.7 has no provenance to offer, reading the bundle is the only inspection route a user has, and minifying would close it.
 
 ### 8.3 Transport and install
 
 **stdio only.** No port, no bind address, no auth surface, no CORS, no unauthenticated local listener — and no second configuration knob.
 
-**Run-from-clone, publish-ready by construction:**
+**The binary takes no arguments.** `--check-drift` left the shipped binary when the check moved to `scripts/` (§7), and the `USAGE` string, the `Invocation` union and the exit-`64` argv refusal path went with it. argv is not a configuration surface; §8.4's one env knob is the whole of it. A binary invoked with an argument it does not have is a caller's mistake, and there is no argument it does have.
+
+**Four install channels, one artifact.** Every channel serves the same `dist/index.js` from the same release (§8.7); they differ only in who does the fetching.
+
+| Channel | Who it is for | How |
+| --- | --- | --- |
+| **npm / npx** — primary | anyone with an MCP client | `npx -y kleinanzeigen-mcp`, no install step |
+| **MCPB** | Claude Desktop | a downloaded `.mcpb`, opened |
+| **Claude Code plugin** | Claude Code | `/plugin marketplace add`, server + skill together (§8.8) |
+| **run-from-clone** | development | `git clone && npm install && npm run build` |
+
+In Claude Code the one-line form is:
+
+```bash
+claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp
+```
+
+local scope by default; `--scope user` / `--scope project` for the others, and any env assignment goes **before** the `--`. In a client that takes a JSON config block, `command: "npx"`, `args: ["-y", "kleinanzeigen-mcp"]`.
+
+**Run-from-clone is no longer the packaging posture** — it is the development path, and it is the only one that yields a tree the drift check and the fixture-capture scripts can run in:
 
 ```bash
 git clone git@github.com:IIxauII/kleinanzeigen-mcp.git
@@ -812,13 +905,17 @@ npm install
 npm run build
 ```
 
-then an absolute path to `dist/index.js` in the MCP client's config block. The package carries a `bin` entry, no `postinstall` and no native dependencies, so if publishing is ever decided it changes one README line and nothing in the code.
+then an absolute path to `dist/index.js` in the client's config block.
+
+**MCPB is the Claude Desktop channel and nothing else.** `claude mcp` has no `.mcpb` path at all, so this is not a fourth way into Claude Code — it is the only way a Desktop user installs this server without hand-editing JSON. The four channels overlap less than they look.
 
 ### 8.4 Configuration — exactly one knob
 
 **`KLEINANZEIGEN_MCP_RATE_LIMIT_MS`.** Unset means 1500 ms. **No floor** — it is the operator's machine, the operator's IP and the operator's risk, and a project that ships the knob should be honest about who bears the consequence rather than performing restraint it cannot enforce.
 
 **An invalid value refuses to start.** Anything that is not a non-negative finite integer kills the process before the transport opens: non-zero exit, reason on stderr. **No silent fallback to 1500 ms** — an operator who set `5000` and got a typo-driven fallback would believe they were being polite while they were not.
+
+**An empty value is unset.** `""` reads as 1500 ms, exactly as an absent variable does. This is the one exception to the paragraph above and it does not weaken it: the "no silent fallback" argument is about an operator who *typed a value* and had it discarded, and an empty box is a user declining to type one. It is also the one invalid value a **host** can produce without the operator entering anything — MCPB's install dialog hands the server `""` when a user selects the number field and clears it (§8.7), and refusing that is a clean install that dies with only stderr to explain itself. Every other non-integer still kills the process.
 
 **A default location was rejected as env config.** It is a tool-argument default, not an environment setting: putting it in env makes an identical tool call return different results on different machines, invisibly to the calling agent and unreproducibly in a bug report.
 
@@ -832,6 +929,10 @@ kleinanzeigen-mcp/<version> (+https://github.com/IIxauII/kleinanzeigen-mcp)
 
 Fixed in code, deliberately **not** an environment variable. Reasoning in [ADR-0003](./docs/adr/0003-non-circumvention.md).
 
+**Unchanged by publishing, and explicitly so.** The URL 404s while the repository is private (§8.7, [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md)), and it stays anyway. The token does two jobs and they separate cleanly: `kleinanzeigen-mcp/<version>` is what a site operator writes a block rule against — the **identify** half, which is the half ADR-0003's non-circumvention argument actually rests on — and the URL is the **explain** half, which is what a private repo costs. The URL is not wrong, it is early. Changing it would mean editing `src/user-agent.ts`, `src/fetch/core.test.ts`, this section and ADR-0003, and then editing them all back.
+
+`<version>` is `src/version.ts`, which is also `serverInfo.version` on every `initialize`. It is committed back by the release (§8.7) rather than left at a placeholder, and *the version is the provenance* (§7) lives on this wire.
+
 ### 8.6 Tests
 
 **vitest.** It handles TypeScript against the tsup setup with no extra configuration, and its fake-timer control is the practical way to test a serialised 1500 ms limiter, exponential backoff, the 60 s `Retry-After` cap and the circuit breaker without a network and without a slow suite. One dev dependency.
@@ -844,7 +945,138 @@ Fixed in code, deliberately **not** an environment variable. Reasoning in [ADR-0
 
 Verbatim capture was rejected (it republishes real ads and real personal data under DSGVO); gitignored-only was rejected (CI and new contributors could not run parser tests); fully synthetic was rejected (the fixture drifts from the real DOM and the tests end up proving only that the parser parses the fixture).
 
+**A `vitest.config.ts` exists, and its job is an `exclude`.** Without one, vitest globs any git worktree left under `.claude/`, which has already reported a 40-file / 446-test suite as 160 files / 1 784 tests — the whole suite run four times, quietly passing. The config excludes `.claude/**`. This is listed here because it is the difference between a suite that reports its own size honestly and one that does not.
+
+**No test may pass by skipping.** `tests/stdio-server.test.ts` was `describe.skipIf(!existsSync(BUNDLE))`, so the only end-to-end test in the repo went silently green whenever `dist/` was absent — precisely the state a fresh checkout is in. A missing bundle now **fails**, with *run `npm run build` first*. A guard that turns the only test of a thing into a no-op under the exact conditions the thing is untested is worse than no guard.
+
+**Cold-install verification is a test, not a checklist.** It packs, installs the tarball into a temp prefix, and drives the installed binary through a real handshake:
+
+```
+npm pack                                     # prepack builds
+npm i ./kleinanzeigen-mcp-*.tgz --prefix $TMP
+$TMP/node_modules/.bin/kleinanzeigen-mcp
+  ├─ stderr: exactly one server_started line
+  ├─ stdout: transport only, nothing else, ever
+  ├─ a real MCP initialize handshake
+  ├─ serverInfo.version == the tarball's package.json version
+  └─ tools/list → the six names
+```
+
+It runs **on every PR and again as a pre-publish gate**: on a PR it catches packaging regressions at review time rather than at release time, and it is the only thing that makes §8.1's `devDependencies` move safe, because it proves the installed bundle resolves nothing at runtime.
+
+`tests/packaging.test.ts` keeps its `bin` / `files` / `engines` / lockfile checks and its negative lifecycle list, gains the positive `prepack` assertion and an assertion that `dependencies` is **absent**, and moves its native-dependency check **onto the packed tarball's contents** — that check goes vacuous the moment nothing is a non-dev dependency.
+
+**CI runs `npm ci → build → typecheck → test` on Node 22 and 24** — the declared `engines` floor and the active LTS. `npm test` stays the single gate, so nothing is CI-only and local and CI cannot drift.
+
 **How much of the suite is fixture-driven versus live is not settled here** — see §10.
+
+### 8.7 Release and distribution
+
+**One maintainer-triggered dispatch publishes one version to every channel.** Reasoning and the trade-offs accepted: [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md). The operational procedure: [`docs/maintenance.md`](./docs/maintenance.md).
+
+```
+workflow_dispatch
+  ├─ drift gate — npm run check:drift, blocks on 1 and on 2, no override (§7)
+  ├─ semantic-release → npm + git tag + GitHub release + CHANGELOG.md
+  ├─ mcpb pack (from a staging directory) → attached to the release
+  └─ mcp-publisher publish (server.json, version stamped from the release)
+```
+
+One dispatch, one version everywhere — the only way *the version is the provenance* holds across channels rather than on npm alone. Nothing auto-propagates: the MCP Registry never polls npm, so a release that skips its step leaves the listing advertising the previous version indefinitely.
+
+**`semantic-release` owns the version, the tag, `CHANGELOG.md` and the GitHub release**, on Conventional Commits, which the history already follows without exception. It is triggered by **`workflow_dispatch`, never by a push to `main`**: the drift gate is network-dependent and has no override, so automatic-on-merge releasing would redden `main` every month the site was unreachable. That also defuses the standard objection to committing release artefacts back, since there is no push trigger for the release commit to loop against.
+
+**Committed back by the release:** `package.json`, `package-lock.json`, `src/version.ts`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. `src/version.ts` is not deleted in favour of a build-time define — the value is load-bearing on two wires (§8.5) and the canonical `0.0.0-development` placeholder fails the User-Agent test outright. The lockfile is in the list because `packaging.test.ts` asserts it is committed, precisely so a cold install resolves the same tree. The two plugin files are in it because the plugin pins the version it ships against (§8.8).
+
+**Dataset refreshes are versioned by what changed**, which is §7's drift check arriving in the release process:
+
+| change | commit | bump |
+| --- | --- | --- |
+| dataset additions / churn | `fix(data): …` | patch |
+| a category or location **renamed or removed** | `feat(data): …` | minor |
+| code | normal rules | |
+
+The split earns its keep: after a removal, an argument that resolved against the previous version stops resolving, which is what a minor is for.
+
+**Tags start at `v0.1.0` on current `main`.** With zero tags, `semantic-release` reads *no previous release* and emits `1.0.0` — a stability promise this project cannot back. `v0.1.0` is simply true (`package.json` and `src/version.ts` both say so) and was never published, so it exists only as a git tag. The v2 SDK migration is a `feat:`, which makes **the first version ever published to npm `0.2.0`**.
+
+**Two `package.json` fields are immutable once published and must be right before the first `npm publish`:**
+
+- `"license": "Unlicense"` — the licence decision, recorded in the README rather than in an ADR.
+- `"mcpName": "io.github.IIxauII/kleinanzeigen"` — how the MCP Registry proves the npm package belongs to the authenticated namespace. It reads `mcpName` out of the published version's metadata, so the package must exist on npm at that exact version before it can be listed. **Casing is inferred, not documented**: the registry formats `io.github.%s/*` from the GitHub login verbatim with no case folding anywhere in the path, and our login is `IIxauII`. Confirm it against the real 403 on the first publish attempt, because this is exactly the value that costs a version bump to correct.
+
+npm metadata is immutable; retrofitting either field is not a follow-up commit. The rest of the manifest — `description` (§4.6's one string), `homepage`, `repository`, `author: Felix (IIxauII)`, `bugs`, and `keywords: mcp, model-context-protocol, kleinanzeigen, classifieds, germany, read-only` — is mutable and merely absent today.
+
+**`server.json` for the MCP Registry** carries `$schema`, `name`, `title`, `description` (≤ 100 characters, schema-enforced), `version`, `repository`, `websiteUrl` and `packages[]`. npm and MCPB coexist in one `packages[]` entry. The MCPB entry needs a GitHub release-asset URL containing `mcp`, over https, with `fileSha256` **required** — and the registry does a redirect-refusing `HEAD` on it, so the asset must be uploaded before the registry step runs. The registry never verifies the hash; clients do, so a wrong hash publishes cleanly and fails every install. Listing is free, automated and unreviewed; there is no licence field, no category, and no disclosure form.
+
+**The MCPB artefact** is a plain zip extracted to disk at install time, so both sidecar datasets survive and `import.meta.url` resolves beside them. Claude Desktop supplies the Node runtime — nothing node-shaped goes in the zip — and the artefact measures ~1.07 MB. Four things about it are decided rather than incidental:
+
+- **Pack from a staging directory, never `mcpb pack .`**, which honours neither `.gitignore` nor `package.json:files` and would ship `src/`, `data/`, `scripts/` and the fixtures. The staging directory holds exactly `manifest.json`, `package.json`, `README.md`, `dist/index.js`, `dist/cities.json`, `dist/category-tree.json`. A staging directory is an allowlist; `.mcpbignore` is a denylist that fails open, and this project's packaging history is already one story about a denylist failing open.
+- **`package.json` ships** for `"type": "module"` alone — without it Node reparses the ESM entry by syntax detection and warns on every cold start.
+- **`user_config.rate_limit_ms` must declare `default: 1500`.** Without a default the host substitutes the literal `${user_config.rate_limit_ms}` into the environment, which §8.4 refuses; with one, a cleared field arrives as `""`, which §8.4 now reads as unset. `required: true` is not the fix and would be wrong anyway — the host then skips generating the MCP config entirely.
+- **Ship unsigned.** `mcpb sign --self-signed` reports success and then fails its own `verify`, because verification checks the chain against the OS trust store, which a self-signed certificate can never be in; it also writes its key into the installed npm package directory, so the identity dies at the next `npm install`. The cost is a *"Not signed"* warning. Buying a real certificate is a separate decision nobody has made.
+
+**No `privacy_policies` key.** The MCPB manifest calls the field required *"when the extension connects to external services … that process user data"*, and on the reading this project can defend, the trigger does not fire: there is no account, no identity, no telemetry, and nothing retained past the process ([ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md)). The only thing that leaves the machine is the caller's search string, sent to the site the tool exists to read. Declaring a policy would imply a data relationship that does not exist. Recorded here so the omission reads as a decision rather than a missed field.
+
+**MCPB has no update mechanism** — no update URL, no version check, nothing. A `.mcpb` on a GitHub release is inert: a new version means the user downloads and opens the file again. This is the channel on which "running a build they did not make and will never be prompted to replace" is most true, and §7's release gate is the whole of the mitigation.
+
+**The repository is private, so there is no provenance**, and the release does not pretend otherwise. npm retired provenance for private sources in 2023; it is a design limitation, not a configuration problem. Publishing uses a **granular npm token** in Actions secrets rather than OIDC, since trusted publishing's headline benefit is gone (the first token cannot be scoped to a package that does not exist yet, so it starts broader and is narrowed after the first publish). `repository`, `homepage`, `bugs` and §8.5's User-Agent URL all 404 for now and stay unchanged. The MCPB is built and attached to every release although nobody outside can download it — it costs one job step, keeps the `.mcpb` provably in step with the npm tarball from the first release, and switches on with no workflow change the day the repository opens. npm and the Registry are unaffected by the visibility: the package is public, and the `io.github.IIxauII` namespace authenticates against the account, not the repository.
+
+**The README says nothing extra about unverifiability.** ADR-0005 records why.
+
+### 8.8 The Claude Code plugin and its skill
+
+**One plugin, hosted in this repository, bundling the server and one skill.** Layout:
+
+```
+.claude-plugin/marketplace.json        ← source: "./plugin"
+plugin/
+  .claude-plugin/plugin.json
+  .mcp.json
+  skills/searching-kanzeigen/SKILL.md
+```
+
+**`source: "./"` is refused.** It makes the whole repository the plugin, so `/plugin marketplace add` drags `src/`, `tests/`, `data/` and 77 863 lines of `dist/` onto every user's disk. The subdirectory payload is three files.
+
+**Every slug the plugin owns takes §4.6's trademark clip** — plugin `kanzeigen`, marketplace `kanzeigen`, skill directory `searching-kanzeigen` — and the discoverability cost of not matching the npm name `kleinanzeigen-mcp` is accepted. The clip stops at prose: the skill's **description must contain "kleinanzeigen.de"**, because that string is what makes it trigger, and naming the site you read is descriptive use. `plugin.json` takes §4.6's one description string, which is now shared across five slots.
+
+**`.mcp.json` pins the version exactly** — `npx -y kleinanzeigen-mcp@<version>`, never floating. The skill below describes a result *shape*; a floating server under a fixed skill means the first output-shape change silently invalidates the skill's text. That pin is why `plugin.json` and `.mcp.json` are committed back by the release (§8.7).
+
+**`.mcp.json` carries no `env` block at all.** A plugin manifest has no MCPB-style `user_config`, so anything written there is static for every user — and the block *overrides* the environment. Writing `"KLEINANZEIGEN_MCP_RATE_LIMIT_MS": "1500"` for visibility would **break the one knob a plugin user has**; omitting it is the only way an exported value still reaches the server, which then falls back to its own default (§8.4).
+
+**The skill is intent-triggered, not tool-triggered.** This is the whole design problem: the knowledge has to load *before* the first bad `search_listings` call, and a description written about the server and its six tools fires once the agent is already reaching for them — one call too late. The description names the site, the German-classifieds domain and secondhand listing search, so it loads when a user asks for a used bike in Cologne.
+
+**It teaches only what the six tool descriptions cannot carry.** The per-tool warnings are already on the wire and pinned to this spec by `descriptions.test.ts`; restating them is the duplication that drifts. The skill's normative content is exactly the following, and a test asserts `SKILL.md` contains these lines verbatim — the same mechanism that pins the tool descriptions:
+
+```
+Resolve before you search. find_category and find_location take a name and
+return candidate ids; search_listings takes ids. A raw string is not a handle.
+
+get_shop takes a shop slug, and find_shop is the only way to one. Same
+resolver-first shape, one live request instead of zero.
+
+A colliding location resolves to nothing. location_resolution.ambiguous is
+true, resolved_to is null, and every candidate is in alternatives. Nothing is
+promoted to a resolution — pick one and say which.
+
+total and reachable are different numbers. reachable is 1250 and never moves.
+A large total against it means narrow the query, not walk fifty pages.
+
+Dedupe on ad id, and never report pages times 25. The result set slides
+underneath a walk, so the same listing arrives twice and another never
+arrives at all.
+
+Only commercial sellers have shops. An empty shop result is not evidence
+that a seller has no listings — private inventory is refused by design.
+```
+
+Form is these rules plus **one worked sequence** (place name → `find_location` → candidates → `search_listings` with `location_id`), because "resolve first" as a bare rule is exactly the instruction agents skip. **Self-contained, with no links out**: a link to this spec resolves for nobody without the repository, and the on-disk path under a plugin install is not stable.
+
+**§2.6's strict-argument rule is deliberately left out.** An unrecognised key is *refused*, loudly — the skill would save a round trip rather than prevent a wrong answer, and the skill's budget goes to quiet failures.
+
+**CI runs `claude plugin validate`** as a manifest check.
+
+**The plugin channel is owner-only until the repository goes public.** A marketplace resolves a plugin from a public git URL or from a path inside the marketplace repository, and this repository is private — so `/plugin marketplace add IIxauII/kleinanzeigen-mcp` works for its owner and for nobody else. Unlike npm, MCPB and the Registry, **this channel ships on the repository's visibility clock, not on the first release's**. Accepted knowingly: "installable in one command" is already satisfied by `npx`, and the plugin is an extra channel rather than the destination-critical one. Submission to `claude-plugins-community` is out of scope for the same reason, and because vendoring the plugin directory into their repository would put every update behind their review queue with no self-hosted channel to fall back on.
 
 ---
 
@@ -868,6 +1100,8 @@ These are the things a user will hit. None is a bug.
 14. **Shop inventory totals do not reconcile.** One shop reports `18 Anzeigen online` on `/pro/`, 17 rows via the (refused) Bestandsliste, and `71 Anzeigen gesamt` separately. Three counts, no known authority — so `ads_online` is reported as the site states it and is not promised to equal `listings.length` summed over pages. A **fourth** figure was seen while building `get_shop` ([#22](https://github.com/IIxauII/kleinanzeigen-mcp/issues/22)): the shop directory's `liveAds` read `11` for a shop whose own `adsOnline` read `10` minutes later. One listing expiring in between would explain it, so it is recorded rather than claimed.
 15. **How deep the shop RPC goes before clamping is unprobed.** `pageSize` is honoured to at least 100 and it terminates cleanly past the end, but the largest shop sampled had 170 listings, so no analogue of the page-50 wall has been ruled out.
 16. **No radius-free rural fallback beyond what the site gives.** `?radius=` covers this properly; but note kleinanzeigen's own catchment is administrative containment, and only 5 `Kr.` nodes exist in Bayern's 2 079 children.
+17. **An installed user cannot check their own bundle for dataset drift.** The check needs a clone; the shipped binary takes no arguments (§8.3). Staleness is inferred instead of measured: you are stale iff a release is overdue, and §7's release gate is what makes that inference sound. Accepted, in exchange for a binary that serves and does nothing else.
+18. **An installed MCPB extension is never prompted to update.** The format has no update mechanism at all, so a `.mcpb` is as current as the day it was downloaded. This is the channel on which limit 17 bites hardest, and the mitigation is entirely on the release side (§8.7).
 
 ---
 
@@ -880,7 +1114,8 @@ Not decisions this spec dodged — questions nothing in it depends on. Each is c
 - **Whether `/pro/` and the Bestandsliste count the same things.** Limit 14 above.
 - **`searchScope`.** `BRANDING` behaved identically to `BOTH` and did not suppress the prose match; `ADS` was never sent. Hardcoding `BOTH` costs nothing given that.
 - **`shipping: false` × `buy_now: true`.** Should be another honest empty set, but that is an inference. It costs one request to learn and returns a correct answer either way.
-- **Publishing** (npm, the unclaimed package names), and the repository licence. Both ride together and neither blocks building.
+- **Whether the repository ever goes public.** Deferred past the first release rather than answered, and four things stay switched off meanwhile: npm provenance, a downloadable MCPB, the `+https://…` half of the User-Agent, and the plugin channel's reach beyond its owner (§8.7, §8.8, [ADR-0005](./docs/adr/0005-four-channels-one-artifact-no-provenance.md)).
+- **Whether a real signing certificate is worth buying for MCPB.** Self-signing cannot verify, so today's artefact is unsigned and carries the warning (§8.7).
 
 ---
 
