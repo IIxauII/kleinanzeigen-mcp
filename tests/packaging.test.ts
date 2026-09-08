@@ -23,7 +23,7 @@ describe("the package", () => {
 
   it("depends on exactly the three runtime packages the spec names", () => {
     expect(Object.keys(pkg.dependencies).sort()) //
-      .toEqual(["@modelcontextprotocol/sdk", "cheerio", "zod"]);
+      .toEqual(["@modelcontextprotocol/server", "cheerio", "zod"]);
   });
 
   it("pulls in no native runtime dependency: nothing shipped builds at install time", () => {

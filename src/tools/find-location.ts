@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ENVELOPE_OUTPUT_SHAPE, localEnvelope } from "../envelope.ts";
 import { LocationNodeSchema, type CityDataset } from "../locations/city-dataset.ts";
@@ -25,11 +25,11 @@ const inputSchema = z.strictObject({
     ),
 });
 
-const outputSchema = {
+const outputSchema = z.object({
   ...ENVELOPE_OUTPUT_SHAPE,
   matches: z.array(LocationNodeSchema),
   count: z.number().int().nonnegative(),
-};
+});
 
 /**
  * Zero requests: resolves in-process against the bundled dataset.

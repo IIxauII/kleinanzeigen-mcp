@@ -1,4 +1,4 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { CategoryNodeSchema, type CategoryTree } from "../categories/category-tree.ts";
 import { findCategories } from "../categories/find-categories.ts";
@@ -17,11 +17,11 @@ const inputSchema = z.strictObject({
   query: z.string().describe("A German category name, optionally qualified as \"Parent > Child\"."),
 });
 
-const outputSchema = {
+const outputSchema = z.object({
   ...ENVELOPE_OUTPUT_SHAPE,
   matches: z.array(CategoryNodeSchema),
   count: z.number().int().nonnegative(),
-};
+});
 
 /**
  * Zero requests: resolves in-process against the bundled tree.

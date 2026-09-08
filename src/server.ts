@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { loadCategoryTree, type CategoryTree } from "./categories/category-tree.ts";
 import { loadCityDataset, type CityDataset } from "./locations/city-dataset.ts";
 import { registerFindCategory } from "./tools/find-category.ts";
