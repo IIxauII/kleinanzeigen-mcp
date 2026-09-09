@@ -1,5 +1,6 @@
 import { chmodSync, copyFileSync } from "node:fs";
 import { defineConfig } from "tsup";
+import { stageMcpb } from "./scripts/stage-mcpb.ts";
 
 // One single-file ESM bundle with every dependency inlined (SPEC 8.2), plus the
 // two datasets as sidecar JSON beside it — never inlined, so first-use reading
@@ -27,5 +28,9 @@ export default defineConfig({
     copyFileSync("data/category-tree.json", "dist/category-tree.json");
     copyFileSync("data/cities.json", "dist/cities.json");
     chmodSync("dist/index.js", 0o755);
+    // The MCPB bundle is assembled here rather than at pack time so that what
+    // ships is an allowlist written down in one place, and so a build is enough
+    // to reproduce the artefact locally (SPEC 8.7).
+    stageMcpb();
   },
 });

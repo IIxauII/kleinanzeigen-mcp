@@ -13,12 +13,19 @@ describe("the one configuration knob", () => {
     expect(DEFAULT_RATE_LIMIT_MS).toBe(1500);
   });
 
+  it("reads an empty value as unset, because a host can produce one on its own", () => {
+    // MCPB's install dialog hands the server `""` when a user selects the
+    // number field and clears it, and nothing else in that flow is a typed
+    // value being discarded. Whitespace is (SPEC 8.4, SPEC 8.7).
+    expect(readRateLimitMs({ KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "" })).toBe(DEFAULT_RATE_LIMIT_MS);
+  });
+
   it("takes the operator's value with no floor", () => {
     expect(readRateLimitMs({ KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "5000" })).toBe(5000);
     expect(readRateLimitMs({ KLEINANZEIGEN_MCP_RATE_LIMIT_MS: "0" })).toBe(0);
   });
 
-  it.each(["", " ", "1500ms", "abc", "-1", "1.5", "1e3", "Infinity", "NaN", "0x10"])(
+  it.each([" ", "1500ms", "abc", "-1", "1.5", "1e3", "Infinity", "NaN", "0x10"])(
     "refuses %o rather than falling back to the default",
     (value) => {
       expect(() => readRateLimitMs({ KLEINANZEIGEN_MCP_RATE_LIMIT_MS: value })).toThrow(ConfigError);
