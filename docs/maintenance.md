@@ -2,7 +2,7 @@
 
 For a maintainer standing in a clone. Nothing here applies to an installed user — the shipped binary takes no arguments and cannot check itself ([SPEC](../SPEC.md) §8.3, §9.17).
 
-> **Status.** This is the specified procedure, settled on the packaging map. **The drift check is on disk** — `scripts/check-drift.ts`, 19 requests, the exit codes as tabled — and so are **the PR checks and the monthly cron**, at `.github/workflows/pr-checks.yml` and `.github/workflows/dataset-drift.yml`. What is still specification rather than disk is **the release**: everything from *Releasing* onwards, including the release gate, lands through the release-automation ticket.
+> **Status.** All of it is on disk. The drift check is `scripts/check-drift.ts`, 19 requests, the exit codes as tabled; the PR checks and the monthly cron are `.github/workflows/pr-checks.yml` and `.github/workflows/dataset-drift.yml`; the release is `.github/workflows/release.yml` and `.releaserc.json`. What is left is **not** code: the four steps under *Before the first release, once* are a maintainer's, and no dispatch has been run yet.
 
 ## The drift check
 
@@ -88,7 +88,7 @@ A GitHub Actions runner is served by the site — verified on three distinct Azu
 
 ## Releasing
 
-One `workflow_dispatch`, four channels, one version. Full reasoning: [ADR-0005](./adr/0005-four-channels-one-artifact.md); the contract: [SPEC](../SPEC.md) §8.7.
+One `workflow_dispatch`, four channels, one version. Full reasoning: [ADR-0005](./adr/0005-four-channels-one-artifact.md); the contract: [SPEC](../SPEC.md) §8.7. On disk it is two files — **`.github/workflows/release.yml`**, which is the dispatch, the credential and nothing else, and **`.releaserc.json`**, which is every step below it.
 
 ```
 workflow_dispatch
@@ -100,7 +100,27 @@ workflow_dispatch
 
 **It is never triggered by a push to `main`.** With a no-override, network-dependent gate, automatic-on-merge releasing turns `main` red in any month the site is unreachable, and a red `main` nobody can act on is a gate everybody learns to ignore.
 
-The publish step authenticates over **OIDC**, not with a token: the job carries `permissions: id-token: write`, runs npm CLI **≥ 11.5.1**, and gets **provenance by default** — no `--provenance` flag, and no `NPM_TOKEN` anywhere in the workflow or the repository's secrets.
+The publish step authenticates over **OIDC**, not with a token: the job carries `permissions: id-token: write`, runs npm CLI **≥ 11.5.1**, and gets **provenance by default** — no `--provenance` flag, and no `NPM_TOKEN` anywhere in the workflow or the repository's secrets. The workflow upgrades npm and then *asserts* the 11.5.1 floor, because an older npm publishes without provenance and succeeds; that failure looks like success.
+
+**The plugin order in `.releaserc.json` is the sequencing contract**, and it is not alphabetical, tidy or rearrangeable:
+
+| # | plugin | why it is there and not elsewhere |
+| --- | --- | --- |
+| 1 | `exec` — `verifyConditionsCmd` | the drift gate, first, so a release that cannot establish dataset currency stops before it has touched npm, the registry or a tag |
+| 2–4 | `commit-analyzer`, `release-notes-generator`, `changelog` | the version and `CHANGELOG.md` |
+| 5 | `npm` | bumps `package.json` and the lockfile — everything below reads the bumped version |
+| 6 | `exec` — `prepareCmd` | `stamp-version.ts` → `build` → `pack:mcpb`, in that order: the build has to see the stamped `manifest.json` and `src/version.ts` |
+| 7 | `git` | commits back what 3, 5 and 6 wrote |
+| 8 | `github` | the release, with the `.mcpb` attached |
+| 9 | `exec` — `publishCmd` | `stamp-server-json.ts` → `mcp-publisher validate` → `publish`, **after** 5 and 8 |
+
+Before any of it, the workflow runs `npm run build && npm test`. That is SPEC §8.6's other half — the cold-install verification "runs on every PR and again as a pre-publish gate" — and it goes first because it is the cheap local answer: a broken build should not spend 19 requests on the site to find out.
+
+`tests/release.test.ts` pins each of those orderings, because none of them fails anywhere a test would otherwise reach: they fail on npm, on a 404 from the registry's `HEAD`, or in a user's install.
+
+`node scripts/stamp-version.ts <version>` is the same script step 6 runs, and it is the one to reach for by hand if a dispatch dies halfway: it is idempotent, it refuses a version the channels would reject, and it fails loudly on a file whose version line it cannot find exactly once.
+
+**A dry run is `npx semantic-release --dry-run --no-ci`.** From any branch but `main` it stops at *"configured to only publish from main"*, which is enough to prove the config loads and every plugin resolves. From `main` it runs the drift gate for real — 19 requests, about 28 seconds — and nothing else.
 
 `semantic-release` commits back `package.json`, `package-lock.json`, `src/version.ts`, `manifest.json`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. The two plugin files are in that list because `.mcp.json` pins the exact version it ships against, and `manifest.json` because the MCPB manifest carries its own `version` field that nothing derives from `package.json`. It commits straight to `main`, which now carries a ruleset — pull request required, force-push and deletion blocked. **A pull-request-required rule refuses that push**, so the ruleset must name the identity the release job pushes as a bypass actor, scoped to it and to nothing else. If that cannot be scoped tightly enough, drop the pull-request rule rather than the other two: on a single-maintainer repository, force-push and deletion blocking are the halves actually protecting anything.
 
@@ -154,21 +174,25 @@ Ownership is proven by `mcp-publisher login github` (which grants `io.github.<lo
 
 1. **`vitest.config.ts` and the v2 SDK migration have landed.** Migrate first, publish once — there are no installed users yet, and MCPB has no update mechanism.
 2. **`"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` are in `package.json`.** npm version metadata is immutable: neither can be added or re-cased afterwards. `mcpName`'s casing is inferred from the registry's source rather than documented — the first publish attempt is where a 403 confirms it.
-3. **`.github/workflows/` exist** for PR checks and the dispatched release. PR checks and the drift cron have landed; the dispatched release has not.
+3. **`.github/workflows/` exist** for PR checks and the dispatched release. All of them have landed: `pr-checks.yml`, `dataset-drift.yml`, `plugin.yml` and `release.yml`.
 4. **Trusted publishing is configured — which takes a placeholder publish first.** It is a per-package setting on npmjs.com and the settings page needs the package to exist, so the first artifact on npm cannot be the one CI publishes. In this order, from your own machine:
 
    ```bash
    npm publish                        # a stub 0.0.1 — license and mcpName already correct, they freeze here too
    # then: npmjs.com/package/kleinanzeigen-mcp/access
-   #       → Trusted publisher → this repository + the release workflow
+   #       → Trusted publisher → IIxauII/kleinanzeigen-mcp, workflow `release.yml`, no environment
    npm deprecate kleinanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
    ```
+
+   **npm registers the workflow by filename.** `release.yml` is that filename, so renaming or moving the file is a publish that stops authenticating — and the error arrives mid-dispatch, after the drift gate has run and the version has been decided.
 
    npm publishes whatever version `package.json` carries, so that publish means setting `package.json` and `src/version.ts` to `0.0.1`, publishing, and **reverting both without committing** — `semantic-release` owns the version from the dispatch onwards, and `v0.1.0` in step 5 must still be a tag that was never published.
 
    Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
 
-   **No npm token goes into Actions secrets, then or ever.** A granular token was the previous answer, from when a private repository made provenance impossible; granular write tokens now expire (7 days by default, 90 at the outside), which turns a credential used a few times a year into a rotation chore that fails while a release is being cut. Expect the first dispatch to need a workaround anyway: `@semantic-release/npm`'s OIDC path has [`#1069`](https://github.com/semantic-release/npm/issues/1069) and [`#1023`](https://github.com/semantic-release/npm/issues/1023) open against it. The bootstrap above already takes the first publish out of CI's hands, which is the sharper half of that exposure.
+   **No npm token goes into Actions secrets, then or ever.** A granular token was the previous answer, from when a private repository made provenance impossible; granular write tokens now expire (7 days by default, 90 at the outside), which turns a credential used a few times a year into a rotation chore that fails while a release is being cut.
+
+   The exposure this used to carry has shrunk but is not gone. `@semantic-release/npm` **13** verifies the OIDC context *before* it looks for a token and returns early when it finds one, so [`#1069`](https://github.com/semantic-release/npm/issues/1069)'s `ENONPMTOKEN` sits behind that branch rather than in front of it, and [`#1023`](https://github.com/semantic-release/npm/issues/1023) is about a first publish from a maintenance branch, which this is not. What is still unproven is the whole path end to end: the token exchange is per package and needs the package to exist, which is exactly what the bootstrap above is for, and nothing here has run against the real registry yet. Read the first dispatch's log for `OIDC token exchange with the npm registry succeeded` rather than assuming it.
 5. **`git tag v0.1.0` on `main`.** With zero tags `semantic-release` reads *no previous release* and emits `1.0.0` — a stability promise this project cannot back. `v0.1.0` is simply true and was never published.
 6. **Dispatch.** The first version on npm is `0.2.0`, because the v2 migration is a `feat:`.
 

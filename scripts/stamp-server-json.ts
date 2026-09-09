@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assertPublishableVersion } from "./lib/version.ts";
 import { defaultMcpbPath, mcpbAssetName } from "./pack-mcpb.ts";
 
 const ROOT = new URL("../", import.meta.url);
@@ -17,9 +18,6 @@ const pkg = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
  * ([SPEC](../SPEC.md) §8.7).
  */
 export const PLACEHOLDER_SHA256 = "0".repeat(64);
-
-/** A specific version, never a range and never `latest` — both are rejected. */
-const PUBLISHABLE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
  * One install channel as the registry models it. `registryType` is the union
@@ -70,18 +68,6 @@ function mcpbAssetUrl(version: string): string {
 }
 
 /**
- * A version the registry would take. Checked before anything touches the disk,
- * because a version that does not parse as semver is marked `latest` by the
- * registry *even when it sorts earlier* — so a malformed release input would
- * silently repoint the listing rather than fail it.
- */
-function assertPublishableVersion(version: string): void {
-  if (!PUBLISHABLE_VERSION.test(version)) {
-    throw new Error(`\`${version}\` is not a version the registry would accept: ranges and \`latest\` are rejected`);
-  }
-}
-
-/**
  * `server.json` as the release would submit it: the version in three places,
  * the asset URL that carries the tag, and the hash of the asset itself.
  *
@@ -128,4 +114,13 @@ export function stampServerJson({
   return result;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(SERVER_JSON_PATH, stampServerJson().version);
+// The release passes the version it is cutting rather than letting it default
+// to `package.json`'s. Both are the same number when the plugins run in the
+// order `.releaserc.json` lists them — `@semantic-release/npm` bumps the
+// package before this runs — and the argument is what keeps that true if
+// anyone reorders them: a stamp that silently used the previous version would
+// publish a listing pointing at a tag and an asset that do not exist.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [version] = process.argv.slice(2);
+  console.log(SERVER_JSON_PATH, stampServerJson(version === undefined ? {} : { version }).version);
+}
