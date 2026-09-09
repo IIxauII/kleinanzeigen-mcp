@@ -105,6 +105,35 @@ Two things about it are not incidental, and both are pinned by `tests/mcpb.test.
 
 Upload it to the release **before** the `mcp-publisher` step: the registry does a redirect-refusing `HEAD` on the asset URL, and a `packages[]` entry pointing at an asset that is not there yet fails.
 
+### The MCP Registry step
+
+`server.json` at the repository root is the submission, and it is committed **unstamped**: the version and the MCPB hash in it belong to a release, not to the working tree.
+
+```bash
+npm run stamp:server-json    # version ×3, the asset URL's tag, and the asset's real SHA-256
+mcp-publisher validate       # brew install mcp-publisher
+mcp-publisher login github   # device-code OAuth; `login github-oidc` in CI, no secret
+mcp-publisher publish
+```
+
+The stamp is a script rather than the reference workflow's one line of `jq` because **three** values move per release, not one: `version` in three places, the release-asset URL that carries the `v<tag>`, and `fileSha256`. It reads the packed `.mcpb` from `build/` and **refuses to run if it is not there**, so the step cannot publish a hash of nothing.
+
+**The hash is the one mistake nothing downstream catches.** The registry never verifies it — clients do — so a wrong hash publishes cleanly and then fails every install. That is why the committed placeholder is sixty-four zeros rather than a plausible value, and why `tests/registry.test.ts` fails if a real-looking hash is ever committed.
+
+**`validate` cannot catch a forgotten stamp.** Sixty-four zeros is schema-valid, so `mcp-publisher validate` passes on the unstamped file exactly as it does on the stamped one. The release must *run* the stamp; validation is not the guard, and the workflow is the only place that can be.
+
+`mcp-publisher login github-oidc` is the CI half of the login and needs `id-token: write`. That permission is **not** this step's alone any more — the npm publish in the same dispatch authenticates the same way — so it belongs at job level rather than being treated as a registry-specific quirk.
+
+The asset URL the stamp builds carries `v<version>`, which is `semantic-release`'s default `tagFormat`. A release config that changes it points the registry at a tag that does not exist — and the failure is the registry's `HEAD`, not a test.
+
+Ownership is proven by `mcp-publisher login github` (which grants `io.github.<login>/*`) plus `mcpName` in the **already published** npm version — the registry reads it out of `registry.npmjs.org/<pkg>/<version>`, so the npm publish has to have landed first. `repository.url` is documentation, not proof; nothing checks it against the authenticated identity.
+
+**If the first publish 403s, it is the casing.** `io.github.IIxauII/kleinanzeigen` is inferred from the registry's source rather than documented, and `mcpName` is immutable in npm metadata — a correction costs a version bump (SPEC §8.7).
+
+`mcp-publisher status --status <active|deprecated|deleted>` handles lifecycle afterwards; `deleted` hides the listing and preserves it.
+
+**The registry is in preview.** A data reset means re-publishing from scratch, and the schema is dated — `server.json` pins `2025-12-11` rather than anything called latest, so the rules only move when someone moves them.
+
 ### Before the first release, once
 
 1. **`vitest.config.ts` and the v2 SDK migration have landed.** Migrate first, publish once — there are no installed users yet, and MCPB has no update mechanism.
