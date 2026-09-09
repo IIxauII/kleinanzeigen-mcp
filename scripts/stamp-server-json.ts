@@ -21,14 +21,25 @@ export const PLACEHOLDER_SHA256 = "0".repeat(64);
 /** A specific version, never a range and never `latest` — both are rejected. */
 const PUBLISHABLE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+/**
+ * One install channel as the registry models it. `registryType` is the union
+ * this project ships rather than the schema's open string, so the one branch
+ * that treats the two channels differently — the MCPB hash and URL — is
+ * exhaustive at the type level instead of stringly-typed.
+ */
 export interface ServerPackage {
-  registryType: string;
+  registryType: "npm" | "mcpb";
   identifier: string;
   version: string;
   fileSha256?: string;
   transport: { type: string };
 }
 
+/**
+ * The submission, as far as this project fills it in. Narrower than the
+ * registry's schema on purpose: the fields here are the ones SPEC 8.7 names, so
+ * a key arriving from somewhere else is a question rather than a silent pass.
+ */
 export interface ServerJson {
   $schema: string;
   name: string;
@@ -40,6 +51,11 @@ export interface ServerJson {
   packages: ServerPackage[];
 }
 
+/**
+ * The file `mcp-publisher` reads, and the one the stamp rewrites in place.
+ * Committed, unlike the `build/` artefacts — it is the submission under review,
+ * and only its version and hash belong to a release.
+ */
 export const SERVER_JSON_PATH = fileURLToPath(new URL("server.json", ROOT));
 
 /**
@@ -49,8 +65,20 @@ export const SERVER_JSON_PATH = fileURLToPath(new URL("server.json", ROOT));
  * step writes and the same `repository` the package declares, so the URL cannot
  * drift from the file it names or the repository it lives in.
  */
-export function mcpbAssetUrl(version: string): string {
+function mcpbAssetUrl(version: string): string {
   return `${pkg.repository}/releases/download/v${version}/${mcpbAssetName(version)}`;
+}
+
+/**
+ * A version the registry would take. Checked before anything touches the disk,
+ * because a version that does not parse as semver is marked `latest` by the
+ * registry *even when it sorts earlier* — so a malformed release input would
+ * silently repoint the listing rather than fail it.
+ */
+function assertPublishableVersion(version: string): void {
+  if (!PUBLISHABLE_VERSION.test(version)) {
+    throw new Error(`\`${version}\` is not a version the registry would accept: ranges and \`latest\` are rejected`);
+  }
 }
 
 /**
@@ -63,12 +91,7 @@ export function mcpbAssetUrl(version: string): string {
  * client rejects ([SPEC](../SPEC.md) §8.7).
  */
 export function stamped(base: ServerJson, version: string, fileSha256: string): ServerJson {
-  if (!PUBLISHABLE_VERSION.test(version)) {
-    // A version that does not parse as semver is marked `latest` by the
-    // registry *even when it sorts earlier*, so a malformed release input would
-    // silently repoint the listing rather than fail it.
-    throw new Error(`\`${version}\` is not a version the registry would accept: ranges and \`latest\` are rejected`);
-  }
+  assertPublishableVersion(version);
   return {
     ...base,
     version,
@@ -90,6 +113,9 @@ export function stampServerJson({
   asset,
   serverJson = SERVER_JSON_PATH,
 }: { version?: string; asset?: string; serverJson?: string } = {}): ServerJson {
+  // Before the disk work: a release input the registry would mangle fails here
+  // rather than after a build's worth of hashing.
+  assertPublishableVersion(version);
   const base: ServerJson = JSON.parse(readFileSync(serverJson, "utf8"));
   const bundle = asset ?? defaultMcpbPath(version);
   if (!existsSync(bundle)) {

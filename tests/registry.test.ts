@@ -4,9 +4,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { mcpbAssetName } from "../scripts/pack-mcpb.ts";
-import { PLACEHOLDER_SHA256, type ServerPackage, stampServerJson, stamped } from "../scripts/stamp-server-json.ts";
+import {
+  PLACEHOLDER_SHA256,
+  SERVER_JSON_PATH,
+  type ServerPackage,
+  stampServerJson,
+  stamped,
+} from "../scripts/stamp-server-json.ts";
 
-const SERVER_JSON_PATH = new URL("../server.json", import.meta.url);
 const server = JSON.parse(readFileSync(SERVER_JSON_PATH, "utf8"));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
@@ -62,7 +67,9 @@ describe("server.json", () => {
     // There is no licence field, no category and no keywords — listing is free,
     // automated and unreviewed. Inventing them would validate and then be
     // dropped silently, which reads as a listing that says something it does
-    // not (SPEC 8.7).
+    // not (SPEC 8.7). `remotes` is the schema's own field and is absent for a
+    // different reason: this server is stdio-only (SPEC 8.2), so there is no
+    // hosted endpoint to advertise and a client must never be pointed at one.
     for (const absent of ["license", "categories", "keywords", "remotes"]) {
       expect(server, absent).not.toHaveProperty(absent);
     }
@@ -96,6 +103,11 @@ describe("server.json", () => {
     // rules the registry enforces, all satisfied by the name `pack:mcpb` packs.
     // It also does a **redirect-refusing `HEAD`** on this URL, so the asset has
     // to be uploaded before the registry step runs (SPEC 8.7).
+    //
+    // The URL is spelled out here from the package's own `repository` and the
+    // packed file's name rather than asked of the stamp: the stamp is the thing
+    // under test, and a restatement is the only version of this check that
+    // fails when the stamp builds a plausible wrong URL.
     expect(mcpbEntry.identifier).toBe(
       `${pkg.repository}/releases/download/v${mcpbEntry.version}/${mcpbAssetName(mcpbEntry.version)}`,
     );
@@ -111,9 +123,15 @@ describe("server.json", () => {
     // schema-valid and unmistakable, and the release replaces it with the hash
     // of the asset it actually uploaded (SPEC 8.7).
     expect(mcpbEntry.fileSha256).toBe(PLACEHOLDER_SHA256);
-    expect(server.version).toBe(pkg.version);
-    expect(npmEntry.version).toBe(pkg.version);
-    expect(mcpbEntry.version).toBe(pkg.version);
+    // The three versions agree with each other and with the tag in the asset
+    // URL, and deliberately **not** with `package.json`. `server.json` is not in
+    // SPEC 8.7's commit-back list — the release stamps it, submits it and never
+    // commits the result — so after the first release the committed version
+    // trails the package's by design. `manifest.json` is the opposite case and
+    // is pinned to the package in `tests/mcpb.test.ts`, because it is in that
+    // list and ships inside the bundle.
+    expect(new Set([server.version, npmEntry.version, mcpbEntry.version]).size).toBe(1);
+    expect(mcpbEntry.identifier).toContain(`/download/v${server.version}/`);
   });
 });
 

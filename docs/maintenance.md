@@ -120,6 +120,12 @@ The stamp is a script rather than the reference workflow's one line of `jq` beca
 
 **The hash is the one mistake nothing downstream catches.** The registry never verifies it — clients do — so a wrong hash publishes cleanly and then fails every install. That is why the committed placeholder is sixty-four zeros rather than a plausible value, and why `tests/registry.test.ts` fails if a real-looking hash is ever committed.
 
+**`validate` cannot catch a forgotten stamp.** Sixty-four zeros is schema-valid, so `mcp-publisher validate` passes on the unstamped file exactly as it does on the stamped one. The release must *run* the stamp; validation is not the guard, and the workflow is the only place that can be.
+
+`mcp-publisher login github-oidc` is the CI half of the login and needs `id-token: write`. That permission is **not** this step's alone any more — the npm publish in the same dispatch authenticates the same way — so it belongs at job level rather than being treated as a registry-specific quirk.
+
+The asset URL the stamp builds carries `v<version>`, which is `semantic-release`'s default `tagFormat`. A release config that changes it points the registry at a tag that does not exist — and the failure is the registry's `HEAD`, not a test.
+
 Ownership is proven by `mcp-publisher login github` (which grants `io.github.<login>/*`) plus `mcpName` in the **already published** npm version — the registry reads it out of `registry.npmjs.org/<pkg>/<version>`, so the npm publish has to have landed first. `repository.url` is documentation, not proof; nothing checks it against the authenticated identity.
 
 **If the first publish 403s, it is the casing.** `io.github.IIxauII/kleinanzeigen` is inferred from the registry's source rather than documented, and `mcpName` is immutable in npm metadata — a correction costs a version bump (SPEC §8.7).
