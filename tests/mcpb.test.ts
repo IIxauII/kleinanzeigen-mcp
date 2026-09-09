@@ -1,22 +1,36 @@
 import { getMcpConfigForManifest } from "@anthropic-ai/mcpb";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { packMcpb } from "../scripts/pack-mcpb.ts";
+import { mcpb, packMcpb } from "../scripts/pack-mcpb.ts";
 import { MCPB_STAGING_DIR, MCPB_STAGING_FILES } from "../scripts/stage-mcpb.ts";
 
-const MCPB_CLI = fileURLToPath(new URL("../node_modules/@anthropic-ai/mcpb/dist/cli/cli.js", import.meta.url));
 const MANIFEST_PATH = fileURLToPath(new URL("../manifest.json", import.meta.url));
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
-function mcpb(...args: string[]): string {
-  return execFileSync(process.execPath, [MCPB_CLI, ...args], { encoding: "utf8" });
+/**
+ * What Claude Desktop would spawn for this manifest, produced by
+ * `getMcpConfigForManifest` — the function it actually runs — rather than by
+ * this test's idea of what it does. `entry_point` is informational; this is the
+ * launch (SPEC 8.7).
+ */
+async function hostConfig(extensionPath: string, userConfig: Record<string, string | number> = {}) {
+  const config = await getMcpConfigForManifest({
+    manifest,
+    extensionPath,
+    systemDirs: { HOME: "/home/nobody", DESKTOP: "/home/nobody/Desktop", DOCUMENTS: "/home/nobody/Documents" },
+    userConfig,
+    pathSeparator: sep,
+  });
+  // `hasRequiredConfigMissing` makes the host skip generating a config
+  // entirely, which is the failure `required: true` would have bought us.
+  if (!config) throw new Error("the host generated no MCP config for this manifest");
+  return config;
 }
 
 /** Every file under a directory, as bundle-relative POSIX paths. */
@@ -55,8 +69,20 @@ describe("the MCPB manifest", () => {
     expect(manifest.version).toBe(pkg.version);
   });
 
-  it("repeats the one shared description byte for byte", () => {
+  it("repeats every field it duplicates from the package, byte for byte", () => {
+    // The manifest is hand-written and shares no code with `package.json` —
+    // `mcpb init` never reads one — so every value stated twice is a value that
+    // can drift silently. `description` is the one shared string of SPEC 4.6,
+    // never paraphrased; the rest is the same metadata `packaging.test.ts` pins
+    // on the package side, pinned again here rather than trusted (SPEC 8.7).
     expect(manifest.description).toBe(pkg.description);
+    expect(manifest.name).toBe(pkg.name);
+    expect(manifest.author.name).toBe(pkg.author);
+    expect(manifest.license).toBe(pkg.license);
+    expect(manifest.homepage).toBe(pkg.homepage);
+    expect(manifest.repository.url).toBe(pkg.repository);
+    expect(manifest.support).toBe(pkg.bugs);
+    expect(manifest.keywords).toEqual(pkg.keywords);
   });
 
   it("declares no privacy policy, which is a decision", () => {
@@ -82,21 +108,13 @@ describe("the MCPB manifest", () => {
   });
 
   /**
-   * Driven through `getMcpConfigForManifest`, the function Claude Desktop
-   * itself runs, rather than through an assumption about it. Substitution is
-   * unprefixed, so the value lands in `process.env` under exactly this name and
-   * `src/config.ts` needs no change (SPEC 8.4).
+   * Substitution is unprefixed, so the value lands in `process.env` under
+   * exactly this name and `src/config.ts` needs no change (SPEC 8.4).
    */
   describe("hands the rate-limit knob to the server as an environment value", () => {
     async function env(userConfig: Record<string, string | number>): Promise<Record<string, string>> {
-      const config = await getMcpConfigForManifest({
-        manifest,
-        extensionPath: "/extensions/kleinanzeigen-mcp",
-        systemDirs: { HOME: "/home/nobody", DESKTOP: "/home/nobody/Desktop", DOCUMENTS: "/home/nobody/Documents" },
-        userConfig,
-        pathSeparator: "/",
-      });
-      return (config?.env ?? {}) as Record<string, string>;
+      const config = await hostConfig("/extensions/kleinanzeigen-mcp", userConfig);
+      return (config.env ?? {}) as Record<string, string>;
     }
 
     it("substitutes the declared default when the user leaves the field alone", async () => {
@@ -143,7 +161,7 @@ describe("the packed MCPB bundle", () => {
     const workspace = mkdtempSync(join(tmpdir(), "kleinanzeigen-mcpb-"));
     temporary.push(workspace);
     unpacked = join(workspace, "unpacked");
-    mcpb("unpack", packMcpb(join(workspace, "bundle.mcpb"), { quiet: true }), unpacked);
+    mcpb("unpack", packMcpb(join(workspace, "bundle.mcpb")), unpacked);
   }, 120_000);
 
   it("stages exactly the allowlist, and `mcpb pack` ships exactly what was staged", () => {
@@ -165,13 +183,27 @@ describe("the packed MCPB bundle", () => {
   });
 
   it("starts from the extracted directory with both datasets beside it", async () => {
-    // The acceptance shape of this channel. Install is a plain extraction to a
-    // real directory, so `import.meta.url` resolves beside the sidecars and the
-    // lazy first-use reads work unchanged — but only if both files are in the
-    // zip, which is the one thing that would break silently (SPEC 8.2, 8.7).
+    // The acceptance shape of this channel, and the two halves of it meet here:
+    // the command, arguments and environment are the ones the host's own
+    // resolver produced for this manifest against this extracted directory —
+    // `${__dirname}` substituted for real — rather than a path this test built
+    // itself. Install is a plain extraction to a real directory, so
+    // `import.meta.url` resolves beside the sidecars and the lazy first-use
+    // reads work unchanged, but only if both files are in the zip. That is the
+    // one thing that would break silently (SPEC 8.2, 8.7).
+    const launch = await hostConfig(unpacked);
+    expect(launch.args).toEqual([`${unpacked}/dist/index.js`]);
+
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await client.connect(
-      new StdioClientTransport({ command: process.execPath, args: [join(unpacked, "dist", "index.js")] }),
+      new StdioClientTransport({
+        // `command` is the bare `node` the manifest asks for: the host supplies
+        // the runtime and nothing node-shaped is in the zip, so this resolves
+        // against PATH exactly as it would on a user's machine.
+        command: launch.command,
+        args: launch.args,
+        env: { ...(process.env as Record<string, string>), ...launch.env },
+      }),
     );
     try {
       const category = await client.callTool({ name: "find_category", arguments: { query: "Bahn & ÖPNV" } });

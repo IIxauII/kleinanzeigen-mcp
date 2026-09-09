@@ -1,5 +1,5 @@
 import { copyFileSync, mkdirSync, rmSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = new URL("../", import.meta.url);
@@ -39,7 +39,7 @@ export const MCPB_STAGING_FILES = [
 export function stageMcpb(): string {
   rmSync(MCPB_STAGING_DIR, { recursive: true, force: true });
   for (const file of MCPB_STAGING_FILES) {
-    const destination = fileURLToPath(new URL(`build/mcpb/${file}`, ROOT));
+    const destination = join(MCPB_STAGING_DIR, file);
     mkdirSync(dirname(destination), { recursive: true });
     copyFileSync(fileURLToPath(new URL(file, ROOT)), destination);
   }

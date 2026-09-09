@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
   "author": {
-    "name": "Felix",
+    "name": "Felix (IIxauII)",
     "url": "https://github.com/IIxauII"
   },
   "homepage": "https://github.com/IIxauII/kleinanzeigen-mcp",
