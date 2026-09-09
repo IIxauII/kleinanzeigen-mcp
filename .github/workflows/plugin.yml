@@ -1,8 +1,9 @@
 # The plugin's manifests are three hand-written JSON files that nothing else
 # parses on the way to a release, so `claude plugin validate` is the only thing
 # standing between a typo and a marketplace that refuses to resolve (SPEC 8.8).
-# It runs in a workflow of its own rather than inside the PR checks, because it
-# needs the Claude Code CLI and nothing else here does.
+# It runs in a workflow of its own, and stays there once §8.6's PR checks land:
+# it needs the Claude Code CLI, which nothing else in this repository does, and
+# it is the only check with a reason to be path-filtered.
 name: plugin
 
 on:

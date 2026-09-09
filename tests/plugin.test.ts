@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { specSection } from "../src/spec-section.ts";
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const json = (path: string) => JSON.parse(read(path));
@@ -17,10 +18,7 @@ const skill = read("plugin/skills/searching-kanzeigen/SKILL.md");
  * mechanism `src/tools/descriptions.test.ts` uses for the tool descriptions.
  */
 function skillRulesInSpec(): string {
-  const spec = read("SPEC.md");
-  const section = /### 8\.8 [\s\S]*?\n(?=## |### |---\n)/u.exec(spec);
-  if (section === null) throw new Error("SPEC no longer has a §8.8");
-  const block = /the same mechanism that pins the tool descriptions:\n\n```\n([\s\S]*?)\n```/u.exec(section[0]);
+  const block = /the same mechanism that pins the tool descriptions:\n\n```\n([\s\S]*?)\n```/u.exec(specSection("8.8"));
   if (block === null) throw new Error("SPEC 8.8 no longer gives the skill's normative content as a fence");
   return block[1]!;
 }
