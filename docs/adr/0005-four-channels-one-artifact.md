@@ -2,7 +2,7 @@
 
 **Status:** accepted
 
-kleinanzeigen-mcp is published to **npm** (the primary channel, installed as `npx -y kleinanzeigen-mcp`), listed in the **MCP Registry**, packed as an **MCPB** for Claude Desktop, and offered as a **Claude Code plugin** that bundles the server together with one skill. All four serve the same `dist/index.js` from the same release, cut by **one maintainer-triggered workflow dispatch**, gated by the dataset drift check.
+kleinanzeigen-mcp is published to **npm** as `kanzeigen-mcp` (the primary channel, installed as `npx -y kanzeigen-mcp`), listed in the **MCP Registry**, packed as an **MCPB** for Claude Desktop, and offered as a **Claude Code plugin** that bundles the server together with one skill. All four serve the same `dist/index.js` from the same release, cut by **one maintainer-triggered workflow dispatch**, gated by the dataset drift check.
 
 The repository is **public**. The package therefore carries **npm provenance**, published over OIDC by **trusted publishing**, and **no npm token exists anywhere in Actions secrets**.
 
@@ -14,7 +14,11 @@ Three things here are hard to reverse, and one of them runs in the wrong directi
 
 **Two `package.json` fields are immutable the moment the first version publishes.** `"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` cannot be added, corrected or re-cased afterwards — npm version metadata is frozen, so a mistake costs a version bump rather than a commit. `mcpName` is the string the MCP Registry reads out of npm to prove the package belongs to the authenticated namespace, and its casing is *inferred from the registry's source*, not documented: `io.github.%s/*` is formatted from the GitHub login verbatim, with no case folding anywhere in the matching path. `IIxauII` is therefore load-bearing, and the first publish attempt is where it gets confirmed against a real 403.
 
-**Publishing claims a name.** `kleinanzeigen-mcp` on npm and `io.github.IIxauII/kleinanzeigen` in the registry are permanent identities for a tool that reads a site whose terms of service, on the site's own reading, forbid it (§12). That is a deliberate act of standing behind the position rather than a packaging step.
+**Publishing claims a name — and the one this ADR was written around was already claimed.** `kanzeigen-mcp` on npm and `io.github.IIxauII/kleinanzeigen` in the registry are permanent identities for a tool that reads a site whose terms of service, on the site's own reading, forbid it (§12). That is a deliberate act of standing behind the position rather than a packaging step.
+
+The npm half of that pair changed late, and the reasoning is worth keeping rather than overwriting. Every version of this ADR before the README ticket said `kleinanzeigen-mcp`, on the assumption — never checked, because the package did not exist yet and the name is an obvious one — that the name was ours to take. It was not: an unrelated MCP server over the same site was published under it on 2026-09-01, as `io.github.taneron/kleinanzeigen`. It is a real, working package rather than a squat, so npm would not transfer it and no dispute was attempted. **The finding cost nothing only because it surfaced while a docs ticket ran an install line by hand, one ticket before the first publish would have hit a 403.** That is the argument for the "run every line by hand" clause being a real gate rather than a formality.
+
+`kanzeigen-mcp` is §4.6's trademark clip, which the plugin, the marketplace and the skill directory already wear (§8.8). **Only the distribution name moved.** The User-Agent token, `serverInfo.name`, the repository and `mcpName` are all still `kleinanzeigen-mcp` or derived from it, because none of them is the package name and one of them — the User-Agent — is what ADR-0003's non-circumvention argument rests on. SPEC §8.3 carries the split.
 
 **And the publish credential cannot be configured until after the first publish.** Trusted publishing is a per-package setting on npmjs.com, and the settings page does not exist for a package that does not exist. Every other sequencing constraint on this project points backwards — get it right *before* the first publish, or pay a version bump. This one points forwards, and its resolution is a version on npm that nobody is meant to install. That deserves its own section.
 
@@ -27,11 +31,11 @@ So: **no npm token ever enters Actions secrets.** On our side the whole of the s
 **The bootstrap is a hand-published `0.0.1`, deprecated on arrival.** In order:
 
 1. `npm publish` a stub `0.0.1` from a maintainer's machine — with `"license"` and `"mcpName"` already correct, because it is a real publish and the immutable fields freeze on it too.
-2. Configure trusted publishing at `npmjs.com/package/kleinanzeigen-mcp/access`, pointing at this repository and the release workflow.
-3. `npm deprecate kleinanzeigen-mcp@0.0.1` with a message that says what it is.
+2. Configure trusted publishing at `npmjs.com/package/kanzeigen-mcp/access`, pointing at this repository and the release workflow.
+3. `npm deprecate kanzeigen-mcp@0.0.1` with a message that says what it is.
 4. Dispatch the release. CI publishes **`0.2.0`, with provenance**, and `latest` moves to it.
 
-Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the real release lands, and the deprecation warning explains the one on the shelf behind it.
+Nobody installs the placeholder: `npx -y kanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the real release lands, and the deprecation warning explains the one on the shelf behind it.
 
 The alternatives, and why each is worse:
 
@@ -68,7 +72,7 @@ npm and the Registry were never affected either way: the package is public regar
 
 - **MCPB is the only way a Claude Desktop user installs this without hand-editing JSON.** `claude mcp` has no `.mcpb` path, so it is not a second route into Claude Code. The channels overlap far less than they look.
 - **The MCP Registry is where an agent or a client goes looking**, and it costs one file and one CLI call. It is free, automated and unreviewed.
-- **The Claude Code plugin exists for the skill, not for the server.** `claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp` already installs the server in one line; what bundling buys is that the skill arrives *with* it. The skill carries the six things the tool descriptions cannot (§8.8) — resolver-first ordering, the null resolution on a colliding location, `total` against `reachable`, dedupe on ad id — and those are quiet failures, the kind a user never reports because the answer looked fine.
+- **The Claude Code plugin exists for the skill, not for the server.** `claude mcp add kleinanzeigen -- npx -y kanzeigen-mcp` already installs the server in one line; what bundling buys is that the skill arrives *with* it. The skill carries the six things the tool descriptions cannot (§8.8) — resolver-first ordering, the null resolution on a colliding location, `total` against `reachable`, dedupe on ad id — and those are quiet failures, the kind a user never reports because the answer looked fine.
 
 Each channel is a version that must be published separately: nothing propagates. That is the recurring cost, and it is why there is exactly one dispatch rather than four procedures.
 
@@ -107,6 +111,8 @@ ADR-0003 was also never put to the test by the release infrastructure. A GitHub 
 **Do not add `dependencies` back.** The three are inlined by `noExternal: [/.*/]`; declaring them cost every `npx` cold start 110 packages and 33 MB for code already in the tarball. The cold-install verification test is what makes their absence safe — it drives a full MCP handshake against an installed tarball and proves the bundle resolves nothing at runtime. **Removing that test re-opens the question**, and the two decisions must move together.
 
 **Do not switch the release to push-triggered.** See the gate above.
+
+**Do not rename the npm package back to `kleinanzeigen-mcp` to match the repository.** It is not available, and the mismatch is the decision rather than an oversight. The same goes in the other direction: do not "finish the job" by clipping the User-Agent token, `serverInfo.name` or the repository to match the package. The User-Agent is the one a site operator blocks on, and ADR-0003 rests on it.
 
 **Do not put an npm token in Actions secrets.** Not as a fallback, not to unblock a failing OIDC publish, and not "just for this release". The expiry makes it a chore that fails at release time, and the token path publishes without provenance unless somebody remembers a flag — which is two of the three reasons it was removed, arriving together.
 

@@ -14,7 +14,7 @@ afterAll(removeCheckouts);
  */
 describe("the package", () => {
   it("carries a bin entry pointing at the built bundle", () => {
-    expect(pkg.bin).toEqual({ "kleinanzeigen-mcp": "./dist/index.js" });
+    expect(pkg.bin).toEqual({ "kanzeigen-mcp": "./dist/index.js" });
     expect(pkg.files).toEqual(["dist"]);
   });
 
