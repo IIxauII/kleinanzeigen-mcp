@@ -90,16 +90,20 @@ jobs:
         run: node scripts/drift-issue.ts "$RUNNER_TEMP/drift-report.json" > "$RUNNER_TEMP/drift-issue.md"
 
       # One issue, updated in place: drift that persists across months is one
-      # condition, not N. The title is fixed for exactly this reason — it is how
-      # last month's issue is found again.
+      # condition, not N. It is found by the marker in its body, not by its
+      # title: the title is the part a maintainer edits while triaging, and a
+      # retitled issue must not become a second one. Only open issues are
+      # looked at, so a tracking issue somebody closed is a decision to start
+      # again rather than a duplicate.
       - name: Open or update the one tracking issue
         if: steps.issue.outputs.drift == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TITLE: ${{ steps.issue.outputs.title }}
+          MARKER: ${{ steps.issue.outputs.marker }}
         run: |
-          existing=$(gh issue list --state open --limit 200 --json number,title \
-            --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')
+          existing=$(gh issue list --state open --limit 200 --json number,body \
+            --jq 'map(select((.body // "") | contains(env.MARKER))) | .[0].number // empty')
           if [ -n "$existing" ]; then
             gh issue edit "$existing" --body-file "$RUNNER_TEMP/drift-issue.md"
             echo "Updated the tracking issue #$existing." >> "$GITHUB_STEP_SUMMARY"
@@ -110,9 +114,20 @@ jobs:
           fi
 
       # Last, so the steps above have already run: the issue is opened whatever
-      # this does. `2` with no drift found is the network answer expiring, and
-      # this workflow's status is the monitor for it.
-      - name: Fail if the check never reached the site
+      # these do. `2` is the network answer expiring, and this workflow's own
+      # status is the monitor for that — but only where it can be, because a run
+      # that found real drift has to stay green for the issue to be the signal.
+      #
+      # So the outage is annotated on **every** `2`, and reddens the run only
+      # where nothing else reports it. Without the annotation the monitor is
+      # blind in the mixed case: drift plus an outage would pass silently.
+      - name: Warn that a dataset never reached the site
+        if: steps.check.outputs.exit_code == '2'
+        run: |
+          echo "::warning title=Drift check incomplete::A dataset never reached the site." \
+               "The bundled datasets are not established as current. See the report in the job log."
+
+      - name: Fail if the run learnt nothing at all
         if: steps.check.outputs.exit_code == '2' && steps.issue.outputs.drift != 'true'
         run: |
           echo "The drift check never reached the site: nothing was established" >&2

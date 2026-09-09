@@ -28,8 +28,9 @@ jobs:
     name: Node ${{ matrix.node }}
     runs-on: ubuntu-latest
     strategy:
-      # Both versions run to completion: which of the two floors broke is the
-      # useful half of the answer, and cancelling the other one throws it away.
+      # Both run to completion: whether a failure is on the floor, on the LTS,
+      # or on both is the useful half of the answer, and cancelling the other
+      # one throws it away.
       fail-fast: false
       matrix:
         node: ["22", "24"]

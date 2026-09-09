@@ -12,17 +12,21 @@
  *   nothing, and an issue would claim otherwise (SPEC 7, `docs/maintenance.md`).
  *
  * There is exactly one such issue: drift that persists across months is one
- * condition, not one per month. The title and the marker below are how the
- * workflow finds it again.
+ * condition, not one per month. `TRACKING_ISSUE_MARKER` is how the workflow
+ * finds it again.
  */
 import { formatReport, REBUILD_COMMANDS, type DatasetReport } from "./report.ts";
 
-/** Fixed, so the cron finds last month's issue instead of opening this month's. */
+/** The title a fresh tracking issue is opened under. */
 export const TRACKING_ISSUE_TITLE = "Dataset drift: the bundled datasets are out of step with the site";
 
 /**
- * Also fixed, and in the body rather than in a label: a label can be removed by
- * hand, and the identity of the one tracking issue should not depend on that.
+ * **How the workflow finds last month's issue instead of opening this month's.**
+ *
+ * In the body rather than in the title, because a title is the part a
+ * maintainer edits while triaging, and in the body rather than in a label
+ * because a label can be removed by hand. The identity of the one tracking
+ * issue should survive both.
  */
 export const TRACKING_ISSUE_MARKER = "<!-- kleinanzeigen-mcp:dataset-drift -->";
 
@@ -59,8 +63,6 @@ export function trackingIssue(
           "",
         ]
       : []),
-    // Paths, not links: relative links do not resolve in an issue body, and an
-    // absolute one would pin a branch this issue outlives.
     "Dataset drift is fixed by regenerating the dataset and shipping a new version,",
     "never by a runtime write (ADR-0002):",
     "",
@@ -73,6 +75,8 @@ export function trackingIssue(
     "Commit by what changed, because `semantic-release` reads it: additions and churn are",
     "`fix(data): …`, a category or locality **renamed or removed** is `feat(data): …`. After a",
     "removal an argument that resolved against the previous version stops resolving, which is",
+    // A path, not a link: a relative link does not resolve in an issue body,
+    // and an absolute one would pin a branch this issue outlives.
     "why that one is a minor. Full procedure: `docs/maintenance.md`.",
     "",
     ...(runUrl ? [`Found by ${runUrl}.`, ""] : []),

@@ -47,7 +47,10 @@ const USAGE = [
 async function main(): Promise<number> {
   // Refused rather than ignored, for the reason an invalid rate limit refuses
   // to start: a silently-swallowed typo lets a maintainer believe they invoked
-  // something they did not (SPEC 8.3).
+  // something they did not (SPEC 8.4). `64` is a usage error and deliberately
+  // outside the check's own `0 | 1 | 2` — it says the check did not run, which
+  // is not one of the three things a run can conclude (`docs/maintenance.md`).
+  // SPEC 8.3's argv contract binds the shipped binary; this is a script.
   const args = process.argv.slice(2);
   const unrecognised = args.find((argument) => argument !== JSON_FLAG);
   if (unrecognised !== undefined) {

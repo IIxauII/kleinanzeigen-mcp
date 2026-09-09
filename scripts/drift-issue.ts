@@ -5,48 +5,36 @@
  *     node scripts/check-drift.ts --json > report.json
  *     node scripts/drift-issue.ts report.json > issue.md
  *
- * It reads the **report**, never the drift check's exit code. A dataset at
- * `drifted` opens an issue even when the other dataset's outage pushed that
- * exit to `2`; a run that only failed to reach the site opens nothing at all
- * (SPEC 7, `docs/maintenance.md`). The decision itself lives in
- * `scripts/drift/issue.ts`, under test — this file is the plumbing around it.
- *
- * The issue body goes to stdout; `drift` and `title` go to `$GITHUB_OUTPUT`
- * when there is one, and to stderr when a maintainer is running it by hand.
+ * It reads the **report**, never the drift check's exit code — the reasoning
+ * for that, and for what each outcome opens, is in `scripts/drift/issue.ts`,
+ * where the decision lives under test. This file is the plumbing around it: the
+ * issue body goes to stdout, and `drift`, `title` and `marker` go to
+ * `$GITHUB_OUTPUT` when there is one, or to stderr when a maintainer is running
+ * it by hand.
  *
  * A missing or unreadable report is an error, not "no drift". The cron would
  * otherwise report itself green in exactly the case where it learnt nothing —
  * the same failure `describe.skipIf` was in `tests/stdio-server.test.ts`.
  */
 import { appendFileSync, readFileSync } from "node:fs";
-import { trackingIssue } from "./drift/issue.ts";
-import type { DatasetReport } from "./drift/report.ts";
+import { TRACKING_ISSUE_MARKER, trackingIssue } from "./drift/issue.ts";
+import { parseReports } from "./drift/report.ts";
 import { note } from "./lib/site.ts";
 
 const USAGE = "usage: node scripts/drift-issue.ts <report.json>";
 
 /**
- * The report as `scripts/check-drift.ts --json` writes it. Checked rather than
- * cast: a shape that changed underneath this script must fail here, where the
- * message says so, instead of composing an issue body out of `undefined`.
+ * `key=value` for `$GITHUB_OUTPUT`, or a stderr line when run outside Actions.
+ *
+ * One line per value, so a value carrying a newline would silently become two
+ * outputs. Everything written here is a constant or a fixed word; a value that
+ * is not is refused rather than mangled.
  */
-function readReports(path: string): DatasetReport[] {
-  const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error(`${path} is not a drift report: expected a non-empty array`);
-  }
-  for (const entry of parsed) {
-    const report = entry as Partial<DatasetReport>;
-    if (typeof report?.dataset !== "string" || typeof report?.outcome !== "string") {
-      throw new Error(`${path} is not a drift report: an entry has no dataset and outcome`);
-    }
-  }
-  return parsed as DatasetReport[];
-}
-
-/** `key=value` for `$GITHUB_OUTPUT`, or a stderr line when run outside Actions. */
-function emit(outputs: Record<string, string>): void {
-  const lines = Object.entries(outputs).map(([key, value]) => `${key}=${value}`);
+function writeStepOutputs(outputs: Record<string, string>): void {
+  const lines = Object.entries(outputs).map(([key, value]) => {
+    if (value.includes("\n")) throw new Error(`step output ${key} spans lines: ${JSON.stringify(value)}`);
+    return `${key}=${value}`;
+  });
   const target = process.env.GITHUB_OUTPUT;
   if (target === undefined || target === "") {
     for (const line of lines) note(line);
@@ -62,15 +50,23 @@ function main(): number {
     return 64;
   }
 
-  const issue = trackingIssue(readReports(path), runUrl());
+  let reports;
+  try {
+    reports = parseReports(readFileSync(path, "utf8"));
+  } catch (error) {
+    note(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  const issue = trackingIssue(reports, runUrl());
   if (issue === null) {
     note("no dataset drifted: nothing to open, nothing to update.");
-    emit({ drift: "false" });
+    writeStepOutputs({ drift: "false" });
     return 0;
   }
 
   process.stdout.write(issue.body);
-  emit({ drift: "true", title: issue.title });
+  writeStepOutputs({ drift: "true", title: issue.title, marker: TRACKING_ISSUE_MARKER });
   return 0;
 }
 
