@@ -1,0 +1,20 @@
+{
+  "name": "kanzeigen",
+  "version": "0.1.0",
+  "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  "author": {
+    "name": "Felix (IIxauII)",
+    "url": "https://github.com/IIxauII"
+  },
+  "homepage": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "repository": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "license": "Unlicense",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "kleinanzeigen",
+    "classifieds",
+    "germany",
+    "read-only"
+  ]
+}

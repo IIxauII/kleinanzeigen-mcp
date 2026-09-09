@@ -1,0 +1,38 @@
+# The plugin's manifests are three hand-written JSON files that nothing else
+# parses on the way to a release, so `claude plugin validate` is the only thing
+# standing between a typo and a marketplace that refuses to resolve (SPEC 8.8).
+# It runs in a workflow of its own rather than inside the PR checks, because it
+# needs the Claude Code CLI and nothing else here does.
+name: plugin
+
+on:
+  pull_request:
+    paths:
+      - ".claude-plugin/**"
+      - "plugin/**"
+      - ".github/workflows/plugin.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".claude-plugin/**"
+      - "plugin/**"
+      - ".github/workflows/plugin.yml"
+  workflow_dispatch:
+
+# Reads the manifests and nothing else: the job never needs to write.
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: claude plugin validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --global @anthropic-ai/claude-code
+      # `--strict` on both: the manifest the marketplace declares and the
+      # manifest the plugin ships are separate documents and either can rot.
+      - run: npm run validate:plugin
