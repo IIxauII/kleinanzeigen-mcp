@@ -2,6 +2,20 @@
   "name": "kleinanzeigen-mcp",
   "version": "0.1.0",
   "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  "mcpName": "io.github.IIxauII/kleinanzeigen",
+  "license": "Unlicense",
+  "author": "Felix (IIxauII)",
+  "homepage": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "repository": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "bugs": "https://github.com/IIxauII/kleinanzeigen-mcp/issues",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "kleinanzeigen",
+    "classifieds",
+    "germany",
+    "read-only"
+  ],
   "type": "module",
   "bin": {
     "kleinanzeigen-mcp": "./dist/index.js"
@@ -14,6 +28,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "prepack": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -24,16 +39,14 @@
     "capture:listing-fixtures": "node --experimental-transform-types scripts/capture-listing-fixtures.ts",
     "capture:shop-fixtures": "node --experimental-transform-types scripts/capture-shop-fixtures.ts"
   },
-  "dependencies": {
-    "@modelcontextprotocol/server": "^2.0.0",
-    "cheerio": "^1.2.0",
-    "zod": "^4.4.3"
-  },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "@types/node": "^22.19.2",
+    "cheerio": "^1.2.0",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "zod": "^4.4.3"
   }
 }
