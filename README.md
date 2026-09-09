@@ -63,13 +63,15 @@ Node **22 or newer** is required. Four channels install the same build from the 
 
 | Channel | Who it is for | Line |
 | --- | --- | --- |
-| **npm / npx** — primary | anyone with an MCP client | `npx -y kleinanzeigen-mcp` |
-| **Claude Code** | one line, no JSON | `claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp` |
+| **npm / npx** — primary | anyone with an MCP client | `npx -y kanzeigen-mcp` |
+| **Claude Code** | one line, no JSON | `claude mcp add kleinanzeigen -- npx -y kanzeigen-mcp` |
 | **Claude Desktop** | no JSON editing at all | download the `.mcpb` from a release and open it |
 | **Claude Code plugin** | the server **and** the skill together | `/plugin marketplace add IIxauII/kleinanzeigen-mcp` |
 | **run-from-clone** | development | [Development](#development) |
 
 ### npm / npx — any MCP client
+
+**The package is `kanzeigen-mcp`, and the clipped name is deliberate.** It is the same trademark clip the plugin and its marketplace already take, and `kleinanzeigen-mcp` on npm is somebody else's package — an unrelated server over the same site, published first. The project, the repository and the User-Agent keep their full name; only the thing you install is clipped.
 
 There is no install step and nothing to build. Point your client at `npx` and let it fetch the package on first run:
 
@@ -78,7 +80,7 @@ There is no install step and nothing to build. Point your client at `npx` and le
   "mcpServers": {
     "kleinanzeigen": {
       "command": "npx",
-      "args": ["-y", "kleinanzeigen-mcp"]
+      "args": ["-y", "kanzeigen-mcp"]
     }
   }
 }
@@ -91,7 +93,7 @@ The transport is **stdio only**: no port, no bind address, no listener. Installi
 To verify by hand, without a client:
 
 ```bash
-npx -y kleinanzeigen-mcp
+npx -y kanzeigen-mcp
 ```
 
 It writes one `server_started` line to stderr and then waits on stdin. `stdout` belongs to the transport and carries nothing else, ever.
@@ -99,7 +101,7 @@ It writes one `server_started` line to stderr and then waits on stdin. `stdout` 
 ### Claude Code
 
 ```bash
-claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp
+claude mcp add kleinanzeigen -- npx -y kanzeigen-mcp
 ```
 
 **Local scope by default** — this project, this machine, you alone. `--scope user` puts it in every project on the machine; `--scope project` writes it into the repository's `.mcp.json`, for everyone who works in it.
@@ -107,12 +109,12 @@ claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp
 **Any environment assignment goes before the `--`.** Everything after the `--` is the command Claude Code runs, so a variable placed there becomes an argument to `npx` rather than an environment variable:
 
 ```bash
-claude mcp add kleinanzeigen -e KLEINANZEIGEN_MCP_RATE_LIMIT_MS=3000 -- npx -y kleinanzeigen-mcp
+claude mcp add kleinanzeigen -e KLEINANZEIGEN_MCP_RATE_LIMIT_MS=3000 -- npx -y kanzeigen-mcp
 ```
 
 ### Claude Desktop — the MCPB
 
-Download `kleinanzeigen-mcp-<version>.mcpb` from [the latest release](https://github.com/IIxauII/kleinanzeigen-mcp/releases/latest) and open it. Claude Desktop installs it and offers the one knob below as a form field, so nothing here needs a config file.
+Download `kanzeigen-mcp-<version>.mcpb` from [the latest release](https://github.com/IIxauII/kleinanzeigen-mcp/releases/latest) and open it. Claude Desktop installs it and offers the one knob below as a form field, so nothing here needs a config file.
 
 **MCPB is the Claude Desktop channel and nothing else.** `claude mcp` has no `.mcpb` path at all, so this is not a second route into Claude Code.
 
@@ -145,7 +147,7 @@ The plugin pins the server to an exact version, because the skill describes a re
   "mcpServers": {
     "kleinanzeigen": {
       "command": "npx",
-      "args": ["-y", "kleinanzeigen-mcp"],
+      "args": ["-y", "kanzeigen-mcp"],
       "env": { "KLEINANZEIGEN_MCP_RATE_LIMIT_MS": "3000" }
     }
   }

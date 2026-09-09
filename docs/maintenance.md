@@ -110,7 +110,7 @@ The publish step authenticates over **OIDC**, not with a token: the job carries 
 
 ```bash
 npm run build            # assembles build/mcpb/ — the staging directory
-npm run pack:mcpb        # → build/kleinanzeigen-mcp-<version>.mcpb
+npm run pack:mcpb        # → build/kanzeigen-mcp-<version>.mcpb
 ```
 
 Two things about it are not incidental, and both are pinned by `tests/mcpb.test.ts` rather than left to the procedure.
@@ -154,19 +154,21 @@ Ownership is proven by `mcp-publisher login github` (which grants `io.github.<lo
 
 1. **`vitest.config.ts` and the v2 SDK migration have landed.** Migrate first, publish once — there are no installed users yet, and MCPB has no update mechanism.
 2. **`"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` are in `package.json`.** npm version metadata is immutable: neither can be added or re-cased afterwards. `mcpName`'s casing is inferred from the registry's source rather than documented — the first publish attempt is where a 403 confirms it.
+
+   **And `"name"` is `kanzeigen-mcp`, not `kleinanzeigen-mcp`.** The unclipped name is somebody else's package on npm (SPEC §8.3), so publishing under it 403s. Do not "fix" it back on the grounds that it matches the repository — the repository, the User-Agent and `serverInfo.name` keep the full name deliberately, and only the package is clipped.
 3. **`.github/workflows/` exist** for PR checks and the dispatched release. PR checks and the drift cron have landed; the dispatched release has not.
 4. **Trusted publishing is configured — which takes a placeholder publish first.** It is a per-package setting on npmjs.com and the settings page needs the package to exist, so the first artifact on npm cannot be the one CI publishes. In this order, from your own machine:
 
    ```bash
    npm publish                        # a stub 0.0.1 — license and mcpName already correct, they freeze here too
-   # then: npmjs.com/package/kleinanzeigen-mcp/access
+   # then: npmjs.com/package/kanzeigen-mcp/access
    #       → Trusted publisher → this repository + the release workflow
-   npm deprecate kleinanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
+   npm deprecate kanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
    ```
 
    npm publishes whatever version `package.json` carries, so that publish means setting `package.json` and `src/version.ts` to `0.0.1`, publishing, and **reverting both without committing** — `semantic-release` owns the version from the dispatch onwards, and `v0.1.0` in step 5 must still be a tag that was never published.
 
-   Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
+   Nobody installs the placeholder: `npx -y kanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
 
    **No npm token goes into Actions secrets, then or ever.** A granular token was the previous answer, from when a private repository made provenance impossible; granular write tokens now expire (7 days by default, 90 at the outside), which turns a credential used a few times a year into a rotation chore that fails while a release is being cut. Expect the first dispatch to need a workaround anyway: `@semantic-release/npm`'s OIDC path has [`#1069`](https://github.com/semantic-release/npm/issues/1069) and [`#1023`](https://github.com/semantic-release/npm/issues/1023) open against it. The bootstrap above already takes the first publish out of CI's hands, which is the sharper half of that exposure.
 5. **`git tag v0.1.0` on `main`.** With zero tags `semantic-release` reads *no previous release* and emits `1.0.0` — a stability promise this project cannot back. `v0.1.0` is simply true and was never published.

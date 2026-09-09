@@ -76,8 +76,8 @@ beforeAll(() => {
   prefix = mkdtempSync(join(tmpdir(), "kleinanzeigen-install-"));
   execFileSync("npm", ["install", tarball, "--prefix", prefix], { cwd: prefix, stdio: "pipe" });
 
-  binary = join(prefix, "node_modules", ".bin", "kleinanzeigen-mcp");
-  installed = JSON.parse(readFileSync(join(prefix, "node_modules", "kleinanzeigen-mcp", "package.json"), "utf8"));
+  binary = join(prefix, "node_modules", ".bin", "kanzeigen-mcp");
+  installed = JSON.parse(readFileSync(join(prefix, "node_modules", "kanzeigen-mcp", "package.json"), "utf8"));
 }, 180_000);
 
 afterAll(() => {
@@ -153,7 +153,7 @@ describe("the installed tarball", () => {
     const packages = readdirSync(join(prefix!, "node_modules"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && entry.name !== ".bin")
       .map((entry) => entry.name);
-    expect(packages).toEqual(["kleinanzeigen-mcp"]);
+    expect(packages).toEqual(["kanzeigen-mcp"]);
   });
 
   it("answers a real MCP handshake with the version its own package.json declares", async () => {

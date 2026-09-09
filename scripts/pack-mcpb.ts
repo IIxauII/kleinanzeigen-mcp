@@ -42,7 +42,7 @@ export function mcpb(...args: string[]): string {
  * name is part of the contract and is always passed explicitly.
  */
 export function mcpbAssetName(version: string): string {
-  return `kleinanzeigen-mcp-${version}.mcpb`;
+  return `kanzeigen-mcp-${version}.mcpb`;
 }
 
 /** Where `pack:mcpb` writes it, and where the registry stamp reads it back. */

@@ -34,7 +34,7 @@ describe("the marketplace", () => {
 
   it("takes the trademark clip in its own slug and in the plugin's", () => {
     // §4.6's clip governs every slug the project owns downstream, and the cost
-    // of not matching the npm name `kleinanzeigen-mcp` is accepted (SPEC 8.8).
+    // the npm name `kanzeigen-mcp` now carries the same clip (SPEC 8.8).
     expect(marketplace.name).toBe("kanzeigen");
     expect(marketplace.plugins[0].name).toBe("kanzeigen");
   });
@@ -59,7 +59,7 @@ describe("the plugin's .mcp.json", () => {
     // skill's text (SPEC 8.8). The pin moves with the release (SPEC 8.7).
     expect(Object.keys(mcp.mcpServers)).toEqual(["kleinanzeigen"]);
     expect(mcp.mcpServers.kleinanzeigen.command).toBe("npx");
-    expect(mcp.mcpServers.kleinanzeigen.args).toEqual(["-y", `kleinanzeigen-mcp@${pkg.version}`]);
+    expect(mcp.mcpServers.kleinanzeigen.args).toEqual(["-y", `kanzeigen-mcp@${pkg.version}`]);
   });
 
   it("carries no env block at all, so the one knob a plugin user has still works", () => {

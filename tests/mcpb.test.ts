@@ -113,7 +113,7 @@ describe("the MCPB manifest", () => {
    */
   describe("hands the rate-limit knob to the server as an environment value", () => {
     async function env(userConfig: Record<string, string | number>): Promise<Record<string, string>> {
-      const config = await hostConfig("/extensions/kleinanzeigen-mcp", userConfig);
+      const config = await hostConfig("/extensions/kanzeigen-mcp", userConfig);
       return (config.env ?? {}) as Record<string, string>;
     }
 
