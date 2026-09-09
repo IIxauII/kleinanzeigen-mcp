@@ -3,15 +3,25 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { spawn as spawnProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const BUNDLE = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 
 /**
  * The acceptance shape of SPEC 8.3: an MCP client spawns the built bundle over
- * stdio, lists its tools and calls one. Skipped until `npm run build` has run.
+ * stdio, lists its tools and calls one.
+ *
+ * A missing bundle **fails**, and used to be `describe.skipIf(!existsSync(
+ * BUNDLE))` — which turned the only end-to-end test in the repo silently green
+ * in exactly the state a fresh checkout is in. A guard that makes the one test
+ * of a thing a no-op under the conditions the thing is untested is worse than
+ * no guard (SPEC 8.6).
  */
-describe.skipIf(!existsSync(BUNDLE))("the built server over stdio", () => {
+describe("the built server over stdio", () => {
+  beforeAll(() => {
+    if (!existsSync(BUNDLE)) throw new Error(`no bundle at ${BUNDLE} — run \`npm run build\` first`);
+  });
+
   async function spawn(): Promise<Client> {
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [BUNDLE] }));
