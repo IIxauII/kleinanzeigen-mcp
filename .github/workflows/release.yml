@@ -86,6 +86,23 @@ jobs:
 
       - run: npm ci
 
+      # The pre-publish half of SPEC 8.6: "it runs on every PR and again as a
+      # pre-publish gate". The suite it belongs to is `tests/cold-install.test.ts`,
+      # which packs, installs the tarball into a temp prefix and drives the
+      # installed binary through a real handshake — the only thing that makes
+      # SPEC 8.1's empty `dependencies` safe, because it proves the installed
+      # bundle resolves nothing at runtime.
+      #
+      # `main` is protected and the PR checks already ran, so this is not
+      # distrust of the branch: it is that the tarball this job is about to
+      # publish is built here, and nothing else in the dispatch would notice a
+      # packaging regression before npm has it. It runs before the drift gate
+      # inside `semantic-release`, so the cheap local answer comes first and a
+      # broken build never spends 19 requests on the site.
+      - run: npm run build
+
+      - run: npm test
+
       # The registry's own CLI is a Go binary, pinned rather than floating: the
       # registry is in preview and its schema is dated for the same reason.
       - name: Install mcp-publisher

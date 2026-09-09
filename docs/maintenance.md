@@ -112,7 +112,9 @@ The publish step authenticates over **OIDC**, not with a token: the job carries 
 | 6 | `exec` — `prepareCmd` | `stamp-version.ts` → `build` → `pack:mcpb`, in that order: the build has to see the stamped `manifest.json` and `src/version.ts` |
 | 7 | `git` | commits back what 3, 5 and 6 wrote |
 | 8 | `github` | the release, with the `.mcpb` attached |
-| 9 | `exec` — `publishCmd` | `stamp-server-json.ts` → `mcp-publisher publish`, **after** 5 and 8 |
+| 9 | `exec` — `publishCmd` | `stamp-server-json.ts` → `mcp-publisher validate` → `publish`, **after** 5 and 8 |
+
+Before any of it, the workflow runs `npm run build && npm test`. That is SPEC §8.6's other half — the cold-install verification "runs on every PR and again as a pre-publish gate" — and it goes first because it is the cheap local answer: a broken build should not spend 19 requests on the site to find out.
 
 `tests/release.test.ts` pins each of those orderings, because none of them fails anywhere a test would otherwise reach: they fail on npm, on a 404 from the registry's `HEAD`, or in a user's install.
 

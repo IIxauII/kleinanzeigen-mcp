@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { PLACEHOLDER_SHA256, type ServerJson, stamped as stampedServerJson } from "../scripts/stamp-server-json.ts";
-import { VERSION_SITES, stampVersion, stamped } from "../scripts/stamp-version.ts";
+import { PLACEHOLDER_SHA256, type ServerJson, stamped } from "../scripts/stamp-server-json.ts";
+import { VERSION_SITES, stampVersion, stampedSource } from "../scripts/stamp-version.ts";
 
 const ROOT = new URL("../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
@@ -95,7 +95,7 @@ describe("the version stamp", () => {
     // registry marks a version it cannot parse `latest` even when it sorts
     // earlier (SPEC 8.7).
     for (const version of ["latest", "^1.2.3", "1.x", ""]) {
-      expect(() => stamped(VERSION_SITES[0]!, read("src/version.ts"), version), version).toThrow(/version/u);
+      expect(() => stampedSource(VERSION_SITES[0]!, read("src/version.ts"), version), version).toThrow(/version/u);
     }
   });
 
@@ -151,7 +151,7 @@ describe("the release configuration", () => {
     // failure would be the registry's rather than a test's (`docs/maintenance.md`).
     expect(config.tagFormat).toBe("v${version}");
     const server: ServerJson = JSON.parse(read("server.json"));
-    const mcpb = stampedServerJson(server, "9.9.9", PLACEHOLDER_SHA256) //
+    const mcpb = stamped(server, "9.9.9", PLACEHOLDER_SHA256) //
       .packages.find((entry) => entry.registryType === "mcpb")!;
     expect(mcpb.identifier).toContain("/download/v9.9.9/");
   });
@@ -237,8 +237,14 @@ describe("the release configuration", () => {
     // read `package.json`, which is only the right number while the plugins run
     // in this order — and nothing downstream catches a listing stamped one
     // version behind, because the registry never verifies anything it is given.
+    // `validate` sits between the stamp and the publish because it is the
+    // registry's own schema check and it is free. It is explicitly *not* the
+    // guard against a forgotten stamp — sixty-four zeros is schema-valid, so
+    // validation passes on the unstamped file exactly as it does on the stamped
+    // one, and running the stamp is the only thing that covers that
+    // (`docs/maintenance.md`).
     expect(String(options("@semantic-release/exec", "publishCmd").publishCmd)).toBe(
-      "node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher publish",
+      "node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher validate && mcp-publisher publish",
     );
   });
 
@@ -297,6 +303,17 @@ describe("the release workflow", () => {
     // exactly the kind this repository checks rather than documents (SPEC 8.7).
     expect(workflow).toContain("npm install --global npm@latest");
     expect(workflow).toContain("11.5.1");
+  });
+
+  it("runs the suite as a pre-publish gate, before anything reaches a channel", () => {
+    // SPEC 8.6: the cold-install verification "runs on every PR and again as a
+    // pre-publish gate". The tarball this job publishes is built here, and
+    // nothing else in the dispatch would notice a packaging regression before
+    // npm has it — at which point the version is spent (SPEC 8.7).
+    const steps = workflow.slice(workflow.indexOf("- run: npm ci"));
+    expect(steps).toContain("- run: npm test");
+    expect(steps.indexOf("- run: npm run build")).toBeLessThan(steps.indexOf("- run: npm test"));
+    expect(steps.indexOf("- run: npm test")).toBeLessThan(steps.indexOf("npx semantic-release"));
   });
 
   it("logs in to the registry over OIDC, with no secret", () => {

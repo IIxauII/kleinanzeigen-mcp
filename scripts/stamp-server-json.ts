@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { assertPublishableVersion } from "./lib/version.ts";
 import { defaultMcpbPath, mcpbAssetName } from "./pack-mcpb.ts";
 
 const ROOT = new URL("../", import.meta.url);
@@ -17,9 +18,6 @@ const pkg = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
  * ([SPEC](../SPEC.md) §8.7).
  */
 export const PLACEHOLDER_SHA256 = "0".repeat(64);
-
-/** A specific version, never a range and never `latest` — both are rejected. */
-const PUBLISHABLE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
  * One install channel as the registry models it. `registryType` is the union
@@ -67,18 +65,6 @@ export const SERVER_JSON_PATH = fileURLToPath(new URL("server.json", ROOT));
  */
 function mcpbAssetUrl(version: string): string {
   return `${pkg.repository}/releases/download/v${version}/${mcpbAssetName(version)}`;
-}
-
-/**
- * A version the registry would take. Checked before anything touches the disk,
- * because a version that does not parse as semver is marked `latest` by the
- * registry *even when it sorts earlier* — so a malformed release input would
- * silently repoint the listing rather than fail it.
- */
-function assertPublishableVersion(version: string): void {
-  if (!PUBLISHABLE_VERSION.test(version)) {
-    throw new Error(`\`${version}\` is not a version the registry would accept: ranges and \`latest\` are rejected`);
-  }
 }
 
 /**

@@ -1,11 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertPublishableVersion } from "./lib/version.ts";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
-
-/** A specific version, never a range and never `latest` — both are rejected. */
-const PUBLISHABLE_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 /**
  * One file that states the version, and the exact shape it states it in.
@@ -55,18 +53,6 @@ export const VERSION_SITES: readonly VersionSite[] = [
 ];
 
 /**
- * A version every channel would take. Checked before anything touches the disk,
- * for the reason `stamp-server-json.ts` checks the same thing: this value
- * reaches npm, the MCPB manifest and the plugin's pin, and the registry marks a
- * version it cannot parse `latest` even when it sorts earlier (SPEC 8.7).
- */
-function assertPublishableVersion(version: string): void {
-  if (!PUBLISHABLE_VERSION.test(version)) {
-    throw new Error(`\`${version}\` is not a version the release channels would accept`);
-  }
-}
-
-/**
  * One file's contents with the version moved, or a throw naming the file.
  *
  * The exactly-once rule is the whole point. The failure this script exists to
@@ -74,7 +60,7 @@ function assertPublishableVersion(version: string): void {
  * place, the release commits it, and the mismatch surfaces to a user rather
  * than to the run that caused it.
  */
-export function stamped(site: VersionSite, source: string, version: string): string {
+export function stampedSource(site: VersionSite, source: string, version: string): string {
   assertPublishableVersion(version);
   const occurrences = source.match(new RegExp(site.pattern, `${site.pattern.flags.replace("g", "")}g`));
   if (occurrences?.length !== 1) {
@@ -95,7 +81,7 @@ export function stampVersion(version: string, root: string = ROOT): string[] {
   assertPublishableVersion(version);
   return VERSION_SITES.map((site) => {
     const path = join(root, site.path);
-    writeFileSync(path, stamped(site, readFileSync(path, "utf8"), version));
+    writeFileSync(path, stampedSource(site, readFileSync(path, "utf8"), version));
     return path;
   });
 }
