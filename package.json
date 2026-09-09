@@ -33,6 +33,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "pack:mcpb": "node scripts/pack-mcpb.ts",
+    "stamp:server-json": "node scripts/stamp-server-json.ts",
     "check:drift": "node scripts/check-drift.ts",
     "generate:category-tree": "node scripts/generate-category-tree.ts",
     "generate:cities": "node scripts/generate-cities.ts",

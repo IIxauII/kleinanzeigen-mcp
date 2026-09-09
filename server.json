@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.IIxauII/kleinanzeigen",
+  "title": "Kleinanzeigen",
+  "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/IIxauII/kleinanzeigen-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "kleinanzeigen-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/IIxauII/kleinanzeigen-mcp/releases/download/v0.1.0/kleinanzeigen-mcp-0.1.0.mcpb",
+      "version": "0.1.0",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

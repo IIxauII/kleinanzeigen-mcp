@@ -41,9 +41,18 @@ export function mcpb(...args: string[]): string {
  * points the MCP Registry at that URL by hash (SPEC 8.7, SPEC 9.18), so the
  * name is part of the contract and is always passed explicitly.
  */
-function defaultMcpbPath(): string {
-  const version = JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8")).version;
-  return fileURLToPath(new URL(`build/kleinanzeigen-mcp-${version}.mcpb`, ROOT));
+export function mcpbAssetName(version: string): string {
+  return `kleinanzeigen-mcp-${version}.mcpb`;
+}
+
+/** Where `pack:mcpb` writes it, and where the registry stamp reads it back. */
+export function defaultMcpbPath(version: string = packageVersion()): string {
+  return fileURLToPath(new URL(`build/${mcpbAssetName(version)}`, ROOT));
+}
+
+/** The version the release is cutting, which `semantic-release` has bumped. */
+function packageVersion(): string {
+  return JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8")).version;
 }
 
 /**
