@@ -1,27 +1,11 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
+import { freshCheckout, removeCheckouts } from "./fresh-checkout.ts";
 
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
-const checkouts: string[] = [];
-afterAll(() => checkouts.forEach((dir) => rmSync(dir, { recursive: true, force: true })));
-
-/** A copy of the tree as a fresh clone has it — no `dist/`, dependencies borrowed. */
-function freshCheckout(): string {
-  const dir = mkdtempSync(join(tmpdir(), "kleinanzeigen-pack-"));
-  checkouts.push(dir);
-  cpSync(ROOT, dir, {
-    recursive: true,
-    filter: (source) => !/(?:^|[/\\])(?:node_modules|\.git|\.claude|dist)$/.test(source),
-  });
-  symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"), "dir");
-  return dir;
-}
+afterAll(removeCheckouts);
 
 /**
  * Publish-ready by construction: every field npm freezes on the first publish
