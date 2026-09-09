@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "kanzeigen-mcp",
   "display_name": "Kleinanzeigen",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
   "author": {
     "name": "Felix (IIxauII)",
