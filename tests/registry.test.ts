@@ -162,7 +162,7 @@ describe("the release stamp", () => {
     expect(result.version).toBe("9.9.9");
     expect(result.packages.map((entry) => entry.version)).toEqual(["9.9.9", "9.9.9"]);
     const mcpb = result.packages.find((entry) => entry.registryType === "mcpb")!;
-    expect(mcpb.identifier).toBe(`${pkg.repository}/releases/download/v9.9.9/kleinanzeigen-mcp-9.9.9.mcpb`);
+    expect(mcpb.identifier).toBe(`${pkg.repository}/releases/download/v9.9.9/kanzeigen-mcp-9.9.9.mcpb`);
     expect(mcpb.fileSha256).toBe(createHash("sha256").update(readFileSync(path)).digest("hex"));
     expect(result.packages.find((entry) => entry.registryType === "npm")).not.toHaveProperty("fileSha256");
   });

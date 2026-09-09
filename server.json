@@ -12,7 +12,7 @@
   "packages": [
     {
       "registryType": "npm",
-      "identifier": "kleinanzeigen-mcp",
+      "identifier": "kanzeigen-mcp",
       "version": "0.1.0",
       "transport": {
         "type": "stdio"
@@ -20,7 +20,7 @@
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/IIxauII/kleinanzeigen-mcp/releases/download/v0.1.0/kleinanzeigen-mcp-0.1.0.mcpb",
+      "identifier": "https://github.com/IIxauII/kleinanzeigen-mcp/releases/download/v0.1.0/kanzeigen-mcp-0.1.0.mcpb",
       "version": "0.1.0",
       "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "transport": {

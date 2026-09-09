@@ -1,5 +1,5 @@
 {
-  "name": "kleinanzeigen-mcp",
+  "name": "kanzeigen-mcp",
   "version": "0.1.0",
   "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
   "mcpName": "io.github.IIxauII/kleinanzeigen",
@@ -18,7 +18,7 @@
   ],
   "type": "module",
   "bin": {
-    "kleinanzeigen-mcp": "./dist/index.js"
+    "kanzeigen-mcp": "./dist/index.js"
   },
   "files": [
     "dist"
