@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kleinanzeigen": {
+      "command": "npx",
+      "args": ["-y", "kleinanzeigen-mcp@0.1.0"]
+    }
+  }
+}

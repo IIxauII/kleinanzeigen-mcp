@@ -1,0 +1,15 @@
+{
+  "name": "kanzeigen",
+  "description": "The kanzeigen plugin: the read-only kleinanzeigen MCP server, pinned to a version, and the skill that drives it.",
+  "owner": {
+    "name": "Felix (IIxauII)",
+    "url": "https://github.com/IIxauII"
+  },
+  "plugins": [
+    {
+      "name": "kanzeigen",
+      "source": "./plugin",
+      "description": "A read-only, robots-clean MCP server over kleinanzeigen.de"
+    }
+  ]
+}

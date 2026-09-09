@@ -34,6 +34,7 @@
     "test:watch": "vitest",
     "pack:mcpb": "node scripts/pack-mcpb.ts",
     "check:drift": "node scripts/check-drift.ts",
+    "validate:plugin": "claude plugin validate . --strict && claude plugin validate ./plugin --strict",
     "generate:category-tree": "node scripts/generate-category-tree.ts",
     "generate:cities": "node scripts/generate-cities.ts",
     "capture:search-fixtures": "node --experimental-transform-types scripts/capture-search-fixtures.ts",
