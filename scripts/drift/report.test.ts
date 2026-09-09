@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   driftExitCode,
   formatReport,
+  parseReports,
   REBUILD_COMMANDS,
   reportFor,
   unavailable,
@@ -150,5 +151,43 @@ describe("the stderr report", () => {
   it("says a clean dataset is clean, so a clean run is not silence", () => {
     expect(formatReport([reportFor("categories", CATEGORIES, { ids: new Set([210, 216]), names: null })])) //
       .toEqual(["categories: clean — 2 bundled, 2 live"]);
+  });
+});
+
+describe("reading a report back", () => {
+  // The cron writes the report with `--json` and reads it in a second step, so
+  // the round trip is the contract between them.
+  it("round-trips what a run produced", () => {
+    const reports = [
+      reportFor("categories", CATEGORIES, { ids: new Set([216, 999]), names: null }),
+      unavailable("locations", new Error("GET … answered 503")),
+    ];
+    expect(parseReports(JSON.stringify(reports))).toEqual(reports);
+  });
+
+  it("refuses a file that is not a report at all", () => {
+    expect(() => parseReports("{}")).toThrow("expected a non-empty array");
+    expect(() => parseReports("[]")).toThrow("expected a non-empty array");
+  });
+
+  it("refuses an entry naming a dataset this project does not have", () => {
+    expect(() => parseReports('[{"dataset":"shops","outcome":"clean"}]')).toThrow("names no known dataset");
+  });
+
+  it("refuses an outcome it does not know, rather than carrying it through", () => {
+    expect(() => parseReports('[{"dataset":"categories","outcome":"probably fine"}]')) //
+      .toThrow("has no known outcome");
+  });
+
+  it("refuses a drifted entry that never says what changed", () => {
+    // The shape a two-field check waves through, and which then fails inside
+    // `formatReport` with a `TypeError` naming none of this.
+    const entry = '[{"dataset":"categories","outcome":"drifted","bundled_count":1,"live_count":2}]';
+    expect(() => parseReports(entry)).toThrow("drifted without saying what changed");
+  });
+
+  it("refuses an unavailable entry with no reason, which is what makes it readable", () => {
+    expect(() => parseReports('[{"dataset":"locations","outcome":"unavailable"}]')) //
+      .toThrow("unavailable without a reason");
   });
 });

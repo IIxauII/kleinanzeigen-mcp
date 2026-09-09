@@ -23,12 +23,42 @@
  * and the stderr report always names each dataset's outcome separately, because
  * a caller decides whether to open an issue from the report rather than from the
  * exit (`docs/maintenance.md`).
+ *
+ *     npm run check:drift -- --json
+ *
+ * writes that same per-dataset report to **stdout** as JSON, and changes nothing
+ * else: the human report still goes to stderr and the exit code is unchanged.
+ * The monthly cron needs the report as data, and the alternative — a workflow
+ * regex over prose — would make the wording of a log line load-bearing.
  */
 import { DATASET_NAMES, driftExitCode, formatReport, unavailable } from "./drift/report.ts";
 import { readBundledDatasets, runDriftCheck } from "./drift/run.ts";
 import { createGet, note } from "./lib/site.ts";
 
+const JSON_FLAG = "--json";
+
+const USAGE = [
+  "usage: npm run check:drift [-- --json]",
+  "",
+  "  (no arguments)   report to stderr and exit 0 | 1 | 2",
+  `  ${JSON_FLAG}           additionally write the per-dataset report to stdout as JSON`,
+].join("\n");
+
 async function main(): Promise<number> {
+  // Refused rather than ignored, for the reason an invalid rate limit refuses
+  // to start: a silently-swallowed typo lets a maintainer believe they invoked
+  // something they did not (SPEC 8.4). `64` is a usage error and deliberately
+  // outside the check's own `0 | 1 | 2` — it says the check did not run, which
+  // is not one of the three things a run can conclude (`docs/maintenance.md`).
+  // SPEC 8.3's argv contract binds the shipped binary; this is a script.
+  const args = process.argv.slice(2);
+  const unrecognised = args.find((argument) => argument !== JSON_FLAG);
+  if (unrecognised !== undefined) {
+    note(`unrecognised argument ${JSON.stringify(unrecognised)}\n${USAGE}`);
+    return 64;
+  }
+  const emitJson = args.includes(JSON_FLAG);
+
   // A committed dataset that cannot even be read is reported as both datasets
   // unavailable — the run never happened, so neither was checked — and exits 2
   // rather than 1: nothing was established about the site, and 1 would have a
@@ -43,6 +73,7 @@ async function main(): Promise<number> {
   }
 
   for (const line of formatReport(reports)) note(line);
+  if (emitJson) process.stdout.write(`${JSON.stringify(reports, null, 2)}\n`);
   return driftExitCode(reports);
 }
 

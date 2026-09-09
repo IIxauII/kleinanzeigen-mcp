@@ -82,6 +82,53 @@ export function reportFor(
   return { dataset, outcome: "drifted", ...counts, added, removed, renamed };
 }
 
+/**
+ * The report as `check-drift.ts --json` writes it, read back.
+ *
+ * Checked against the union rather than cast, and per outcome rather than by
+ * two fields: a `drifted` entry missing its `added` array would otherwise pass
+ * and fail later inside `formatReport`, with a `TypeError` in place of a
+ * message saying what is wrong with the file.
+ */
+export function parseReports(json: string): DatasetReport[] {
+  const parsed: unknown = JSON.parse(json);
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    throw new Error("not a drift report: expected a non-empty array");
+  }
+  return parsed.map((entry, index) => {
+    const where = `not a drift report: entry ${index}`;
+    const report = entry as Partial<DatasetReport>;
+    if (!DATASET_NAMES.includes(report?.dataset as DatasetName)) {
+      throw new Error(`${where} names no known dataset`);
+    }
+    const counted = (): void => {
+      const { bundled_count, live_count } = report as { bundled_count?: unknown; live_count?: unknown };
+      if (typeof bundled_count !== "number" || typeof live_count !== "number") {
+        throw new Error(`${where} is missing its counts`);
+      }
+    };
+    switch (report.outcome) {
+      case "clean":
+        counted();
+        break;
+      case "drifted": {
+        counted();
+        const { added, removed, renamed } = report;
+        if (!Array.isArray(added) || !Array.isArray(removed) || !Array.isArray(renamed)) {
+          throw new Error(`${where} is drifted without saying what changed`);
+        }
+        break;
+      }
+      case "unavailable":
+        if (typeof report.message !== "string") throw new Error(`${where} is unavailable without a reason`);
+        break;
+      default:
+        throw new Error(`${where} has no known outcome`);
+    }
+    return report as DatasetReport;
+  });
+}
+
 /** Reports a leg that never produced readable bytes, which is not the same as a clean dataset. */
 export function unavailable(dataset: DatasetName, error: unknown): DatasetReport {
   return {
