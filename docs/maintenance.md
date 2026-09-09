@@ -2,15 +2,18 @@
 
 For a maintainer standing in a clone. Nothing here applies to an installed user — the shipped binary takes no arguments and cannot check itself ([SPEC](../SPEC.md) §8.3, §9.17).
 
-> **Status.** This is the specified procedure, settled on the packaging map. **The drift check below is on disk** — `scripts/check-drift.ts`, 19 requests, the exit codes as tabled. The workflows that call it — the monthly cron and the release gate — land through the CI and release tickets on that map; until they do, everything from *The monthly cron* onwards is what they are built against rather than a description of what is on disk.
+> **Status.** This is the specified procedure, settled on the packaging map. **The drift check is on disk** — `scripts/check-drift.ts`, 19 requests, the exit codes as tabled — and so are **the PR checks and the monthly cron**, at `.github/workflows/pr-checks.yml` and `.github/workflows/dataset-drift.yml`. What is still specification rather than disk is **the release**: everything from *Releasing* onwards, including the release gate, lands through the release-automation ticket.
 
 ## The drift check
 
 The two bundled datasets are build-time snapshots. When the site's taxonomy or its location tree moves, the snapshots stop matching — *Dataset drift*, in `CONTEXT.md`'s terms. The check is the only thing that notices.
 
 ```bash
-npm run check:drift        # → node scripts/check-drift.ts
+npm run check:drift             # → node scripts/check-drift.ts
+npm run check:drift -- --json   # …and the same per-dataset report on stdout, as JSON
 ```
+
+`--json` changes nothing else: the human report still goes to stderr and the exit code is unchanged. It exists because the cron decides from the report, and the alternative — a workflow matching on prose — would make the wording of a log line load-bearing.
 
 **19 requests**, serialised at 1500 ms, about 28 seconds:
 
@@ -66,7 +69,13 @@ The minor on a removal is not bookkeeping: after a removal, an argument that res
 
 ### The monthly cron
 
-A scheduled GitHub Actions workflow runs the same check against the repository's `data/`, so the cron and the release gate share one code path and one meaning of "checked". Users' staleness is inferred rather than measured: **they are stale iff a release is overdue.**
+`.github/workflows/dataset-drift.yml` runs the same check against the repository's `data/` on the 1st of each month, and on demand via `workflow_dispatch`, so the cron and the release gate share one code path and one meaning of "checked". Users' staleness is inferred rather than measured: **they are stale iff a release is overdue.**
+
+It reads the report, not the exit code. `npm run check:drift -- --json` hands the per-dataset report to `scripts/drift-issue.ts`, which composes the tracking issue — or decides there is none to open — and the workflow then creates it, or edits the existing one found by its fixed title. One issue: drift that persists across months is one condition, not one per month.
+
+**A scheduled workflow stops on its own after 60 days without a commit.** GitHub disables it and emails the maintainer; re-enable it from the Actions tab. On a monthly check in a quiet repository this is the likeliest way the cron goes silent, and a silent cron is not a clean one.
+
+**The run goes red on an outage and stays green on drift.** Drift is signalled by the issue, and a red monthly cron meaning two different things is a status nobody reads. A run with nothing but `unavailable` opens no issue — a check that never reached the site has learnt nothing — and fails instead, which is the whole point of the paragraph below.
 
 A GitHub Actions runner is served by the site — verified on three distinct Azure IPs across both gateway routes the check touches, HTTP 200 with no interstitial and no `Retry-After`. What is *not* established is durability: three runs inside three minutes, and Azure ranges are what a future tightening would target. **The cron's own exit status is the monitor for that.** A check that starts failing on the network leg rather than on real drift is the signal that this answer expired. ADR-0003 forbids the obvious workaround — a self-hosted runner is not the fallback, and neither is anything else that routes around a block.
 
@@ -109,7 +118,7 @@ Upload it to the release **before** the `mcp-publisher` step: the registry does 
 
 1. **`vitest.config.ts` and the v2 SDK migration have landed.** Migrate first, publish once — there are no installed users yet, and MCPB has no update mechanism.
 2. **`"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` are in `package.json`.** npm version metadata is immutable: neither can be added or re-cased afterwards. `mcpName`'s casing is inferred from the registry's source rather than documented — the first publish attempt is where a 403 confirms it.
-3. **`.github/workflows/` exist** for PR checks and the dispatched release.
+3. **`.github/workflows/` exist** for PR checks and the dispatched release. PR checks and the drift cron have landed; the dispatched release has not.
 4. **Trusted publishing is configured — which takes a placeholder publish first.** It is a per-package setting on npmjs.com and the settings page needs the package to exist, so the first artifact on npm cannot be the one CI publishes. In this order, from your own machine:
 
    ```bash

@@ -1,0 +1,120 @@
+# The monthly drift check: does the repository's `data/` still match the site?
+#
+# It runs the same `npm run check:drift` the release gate runs, against the
+# repository's `data/` rather than a published tarball — one code path, one
+# meaning of "checked". Users' staleness is inferred rather than measured: they
+# are stale iff a release is overdue (SPEC 7, `docs/maintenance.md`).
+#
+# | the check said | this workflow does |
+# | --- | --- |
+# | `0`, both datasets clean | nothing |
+# | a dataset drifted | opens **or updates** the one tracking issue |
+# | nothing but `unavailable` | logs, opens nothing, and goes **red** |
+#
+# **The decision is made from the per-dataset report, not from the process exit
+# code.** A dataset at `drifted` opens an issue even when the other dataset's
+# outage pushed the exit to `2` — real drift is never swallowed by the other
+# half's failure.
+#
+# **Nothing but an outage opens nothing on purpose.** A check that never reached
+# the site has learnt nothing, and an issue would claim otherwise. It fails the
+# run instead, because that is the one thing this workflow's own status is for:
+# a GitHub Actions runner *is* served by the site today, verified on three
+# distinct Azure IPs across both gateway routes, and what is not established is
+# durability. A cron that starts failing on the network leg rather than on real
+# drift is the signal that the answer expired. ADR-0003 forbids routing around
+# it — a self-hosted runner is not the fallback.
+#
+# Real drift leaves the run green: the tracking issue is that signal, and a red
+# monthly cron that means two different things is a status nobody reads.
+name: Dataset drift
+
+on:
+  schedule:
+    # Monthly. Off the hour, because everything scheduled on it queues together.
+    - cron: "17 6 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# Never two at once: two runs racing would open two issues for one condition.
+concurrency:
+  group: dataset-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the bundled datasets against the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      # 19 requests serialised at 1500 ms, about 28 seconds and several
+      # megabytes. The human report goes to stderr and into this log; `--json`
+      # puts the same per-dataset report on stdout, which is what the next step
+      # decides from. A regex over the prose would make a log line's wording
+      # load-bearing.
+      - name: Run the drift check
+        id: check
+        run: |
+          set +e
+          npm run --silent check:drift -- --json \
+            > "$RUNNER_TEMP/drift-report.json" 2> "$RUNNER_TEMP/drift-report.txt"
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/drift-report.txt" >&2
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Drift check'
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/drift-report.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reads the report. A missing or unreadable one fails here rather than
+      # being read as "no drift" — a cron that reports itself green in the case
+      # where it learnt nothing is the failure this whole ticket removed from
+      # `tests/stdio-server.test.ts`.
+      - name: Compose the tracking issue
+        id: issue
+        run: node scripts/drift-issue.ts "$RUNNER_TEMP/drift-report.json" > "$RUNNER_TEMP/drift-issue.md"
+
+      # One issue, updated in place: drift that persists across months is one
+      # condition, not N. The title is fixed for exactly this reason — it is how
+      # last month's issue is found again.
+      - name: Open or update the one tracking issue
+        if: steps.issue.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ steps.issue.outputs.title }}
+        run: |
+          existing=$(gh issue list --state open --limit 200 --json number,title \
+            --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file "$RUNNER_TEMP/drift-issue.md"
+            echo "Updated the tracking issue #$existing." >> "$GITHUB_STEP_SUMMARY"
+          else
+            url=$(gh issue create --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/drift-issue.md" --label needs-triage)
+            echo "Opened the tracking issue $url." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Last, so the steps above have already run: the issue is opened whatever
+      # this does. `2` with no drift found is the network answer expiring, and
+      # this workflow's status is the monitor for it.
+      - name: Fail if the check never reached the site
+        if: steps.check.outputs.exit_code == '2' && steps.issue.outputs.drift != 'true'
+        run: |
+          echo "The drift check never reached the site: nothing was established" >&2
+          echo "about the bundled datasets, so no issue was opened. See the report above." >&2
+          exit 1
