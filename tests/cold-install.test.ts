@@ -76,8 +76,8 @@ beforeAll(() => {
   prefix = mkdtempSync(join(tmpdir(), "kleinanzeigen-install-"));
   execFileSync("npm", ["install", tarball, "--prefix", prefix], { cwd: prefix, stdio: "pipe" });
 
-  binary = join(prefix, "node_modules", ".bin", "kleinanzeigen-mcp");
-  installed = JSON.parse(readFileSync(join(prefix, "node_modules", "kleinanzeigen-mcp", "package.json"), "utf8"));
+  binary = join(prefix, "node_modules", ".bin", "kanzeigen-mcp");
+  installed = JSON.parse(readFileSync(join(prefix, "node_modules", "kanzeigen-mcp", "package.json"), "utf8"));
 }, 180_000);
 
 afterAll(() => {
@@ -153,7 +153,7 @@ describe("the installed tarball", () => {
     const packages = readdirSync(join(prefix!, "node_modules"), { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && entry.name !== ".bin")
       .map((entry) => entry.name);
-    expect(packages).toEqual(["kleinanzeigen-mcp"]);
+    expect(packages).toEqual(["kanzeigen-mcp"]);
   });
 
   it("answers a real MCP handshake with the version its own package.json declares", async () => {
@@ -162,6 +162,11 @@ describe("the installed tarball", () => {
     // `src/version.test.ts` holds that constant to the manifest the release
     // commits back (SPEC 8.7). A tarball built at one version and stamped at
     // another fails here.
+    //
+    // `serverInfo.name` is deliberately **not** the name this tarball was
+    // installed under: the distribution took §4.6's trademark clip and the
+    // project identity did not, so the wire still says `kleinanzeigen-mcp`
+    // while `node_modules/` says `kanzeigen-mcp` (SPEC 8.5, 8.8, ADR-0003).
     const client = await connect();
     try {
       expect(client.getServerVersion()).toMatchObject({

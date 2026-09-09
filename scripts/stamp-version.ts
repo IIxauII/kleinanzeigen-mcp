@@ -49,7 +49,7 @@ export const VERSION_SITES: readonly VersionSite[] = [
   { path: "plugin/.claude-plugin/plugin.json", pattern: /(\n {2}"version": ")[^"]*(")/u },
   // The plugin pins the exact server version it ships against, never floating:
   // the skill describes a result *shape* (SPEC 8.8).
-  { path: "plugin/.mcp.json", pattern: /("kleinanzeigen-mcp@)[^"]*(")/u },
+  { path: "plugin/.mcp.json", pattern: /("kanzeigen-mcp@)[^"]*(")/u },
 ];
 
 /**

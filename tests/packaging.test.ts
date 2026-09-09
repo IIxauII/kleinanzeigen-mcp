@@ -1,6 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it } from "vitest";
+import { specSection } from "../src/spec-section.ts";
+import { USER_AGENT } from "../src/user-agent.ts";
 import { freshCheckout, removeCheckouts } from "./fresh-checkout.ts";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
@@ -14,8 +16,31 @@ afterAll(removeCheckouts);
  */
 describe("the package", () => {
   it("carries a bin entry pointing at the built bundle", () => {
-    expect(pkg.bin).toEqual({ "kleinanzeigen-mcp": "./dist/index.js" });
+    expect(pkg.bin).toEqual({ "kanzeigen-mcp": "./dist/index.js" });
     expect(pkg.files).toEqual(["dist"]);
+  });
+
+  it("is distributed under the free npm name, which is not the project's own", () => {
+    // `kleinanzeigen-mcp` on npm belongs to somebody else's real, functioning
+    // server over the same site, published first — so `npx -y
+    // kleinanzeigen-mcp` fetches a stranger and the first publish from here
+    // would 403. The distribution name takes 4.6's trademark clip, like every
+    // other slug this project owns (SPEC 8.1, 8.8).
+    expect(pkg.name).toBe("kanzeigen-mcp");
+    // The bin key is the command `npx` puts on PATH, and npm links it only
+    // from a package it installed under this name.
+    expect(Object.keys(pkg.bin)).toEqual([pkg.name]);
+  });
+
+  it("keeps the project identity out of the rename, on both wires", () => {
+    // The distribution name moved and these two deliberately did not. The
+    // User-Agent token is what a site operator writes a block rule against —
+    // the identify half ADR-0003's non-circumvention argument rests on — and
+    // `serverInfo.name` rides the same wire (SPEC 8.5, 8.8, ADR-0003). A
+    // blanket rename across the repo would take both; this fails if one does.
+    expect(USER_AGENT.split("/")[0]).toBe("kleinanzeigen-mcp");
+    expect(specSection("4.6")).toContain('name: "kleinanzeigen-mcp",');
+    expect(pkg.name).not.toBe("kleinanzeigen-mcp");
   });
 
   it("has no install-time lifecycle script at all", () => {

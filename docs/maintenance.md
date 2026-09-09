@@ -130,7 +130,7 @@ Before any of it, the workflow runs `npm run build && npm test`. That is SPEC §
 
 ```bash
 npm run build            # assembles build/mcpb/ — the staging directory
-npm run pack:mcpb        # → build/kleinanzeigen-mcp-<version>.mcpb
+npm run pack:mcpb        # → build/kanzeigen-mcp-<version>.mcpb
 ```
 
 Two things about it are not incidental, and both are pinned by `tests/mcpb.test.ts` rather than left to the procedure.
@@ -179,16 +179,16 @@ Ownership is proven by `mcp-publisher login github` (which grants `io.github.<lo
 
    ```bash
    npm publish                        # a stub 0.0.1 — license and mcpName already correct, they freeze here too
-   # then: npmjs.com/package/kleinanzeigen-mcp/access
+   # then: npmjs.com/package/kanzeigen-mcp/access
    #       → Trusted publisher → IIxauII/kleinanzeigen-mcp, workflow `release.yml`, no environment
-   npm deprecate kleinanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
+   npm deprecate kanzeigen-mcp@0.0.1 "bootstrap placeholder for trusted publishing — install the latest version"
    ```
 
    **npm registers the workflow by filename.** `release.yml` is that filename, so renaming or moving the file is a publish that stops authenticating — and the error arrives mid-dispatch, after the drift gate has run and the version has been decided.
 
    npm publishes whatever version `package.json` carries, so that publish means setting `package.json` and `src/version.ts` to `0.0.1`, publishing, and **reverting both without committing** — `semantic-release` owns the version from the dispatch onwards, and `v0.1.0` in step 5 must still be a tag that was never published.
 
-   Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
+   Nobody installs the placeholder: `npx -y kanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the dispatch lands. **Do not unpublish it** — the deprecation is the record of how publishing got configured, and an unpublish leaves a hole in the version list that explains nothing.
 
    **No npm token goes into Actions secrets, then or ever.** A granular token was the previous answer, from when a private repository made provenance impossible; granular write tokens now expire (7 days by default, 90 at the outside), which turns a credential used a few times a year into a rotation chore that fails while a release is being cut.
 
