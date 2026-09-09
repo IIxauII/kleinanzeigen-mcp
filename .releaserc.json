@@ -1,0 +1,43 @@
+{
+  "branches": ["main"],
+  "tagFormat": "v${version}",
+  "plugins": [
+    ["@semantic-release/exec", { "verifyConditionsCmd": "npm run check:drift" }],
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    "@semantic-release/changelog",
+    "@semantic-release/npm",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "node scripts/stamp-version.ts ${nextRelease.version} && npm run build && npm run pack:mcpb"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": [
+          "package.json",
+          "package-lock.json",
+          "src/version.ts",
+          "manifest.json",
+          "CHANGELOG.md",
+          "plugin/.claude-plugin/plugin.json",
+          "plugin/.mcp.json"
+        ]
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [{ "path": "build/*.mcpb", "label": "MCPB bundle for Claude Desktop" }]
+      }
+    ],
+    [
+      "@semantic-release/exec",
+      {
+        "publishCmd": "node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher publish"
+      }
+    ]
+  ]
+}

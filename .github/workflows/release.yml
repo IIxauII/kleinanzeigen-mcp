@@ -1,0 +1,116 @@
+# One dispatch, four channels, one version (SPEC 8.7, ADR-0005).
+#
+#     workflow_dispatch
+#       ├─ drift gate — npm run check:drift, blocks on 1 and on 2, no override
+#       ├─ semantic-release → npm + git tag + GitHub release + CHANGELOG.md
+#       ├─ mcpb pack (staging dir) → attached to the release
+#       └─ mcp-publisher publish (server.json, version stamped from the release)
+#
+# The last three are `semantic-release` plugin steps rather than steps here, and
+# that is the point: `.releaserc.json` lists them in the order they have to run,
+# and the two orderings that matter are enforced by that list rather than by a
+# reader of this file. The npm publish lands before the registry step, because
+# the registry proves ownership by reading `mcpName` out of the published npm
+# version; the MCPB asset is uploaded before it too, because the registry does a
+# redirect-refusing `HEAD` on the asset URL (`docs/maintenance.md`).
+#
+# **Never triggered by a push to `main`.** The drift gate is network-dependent
+# and has no override, so automatic-on-merge releasing would redden `main` in
+# any month the site was unreachable — and a red `main` nobody can act on is a
+# gate everybody learns to ignore. Maintainer-triggered keeps it absolute rather
+# than negotiable, and there is no push trigger for the release commit to loop
+# against (ADR-0005).
+name: Release
+
+on:
+  workflow_dispatch:
+
+# Two releases at once would race for the tag, the npm version and the registry
+# listing. Never cancelled: a half-finished release is worse than a queued one.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish one version to every channel
+    runs-on: ubuntu-latest
+
+    # On the job rather than on the workflow: `id-token: write` is the whole of
+    # the publish credential and it belongs to the one job that publishes.
+    permissions:
+      # `semantic-release`'s tag, its GitHub release, and the commit-back
+      # `@semantic-release/git` pushes to `main`.
+      contents: write
+      # npm trusted publishing *and* `mcp-publisher login github-oidc`. Both
+      # authenticate the same way, which is why this is not a registry quirk.
+      id-token: write
+      # `@semantic-release/github` comments on the issues and pull requests a
+      # release resolves. Nothing here creates either.
+      issues: write
+      pull-requests: write
+
+    steps:
+      # `semantic-release` reads the whole history and every tag: it decides the
+      # bump from the commits since the last release, so a shallow clone reads
+      # as "no previous release" and emits 1.0.0.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # `semantic-release` authenticates the push itself from GITHUB_TOKEN.
+          # A stored credential from the checkout is a second answer to the same
+          # question, and the one that silently wins.
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      # Trusted publishing needs npm >= 11.5.1 and the runner's bundled npm is
+      # older than that on every image so far, so it is upgraded explicitly
+      # rather than assumed of `setup-node`. The floor is asserted rather than
+      # hoped for: an older npm publishes *without* provenance and succeeds,
+      # which is the failure that looks like success (SPEC 8.7).
+      - name: Upgrade npm past the trusted-publishing floor
+        env:
+          NPM_FLOOR: "11.5.1"
+        run: |
+          npm install --global npm@latest
+          installed=$(npm --version)
+          echo "npm $installed"
+          if [ "$(printf '%s\n%s\n' "$NPM_FLOOR" "$installed" | sort --version-sort | head -1)" != "$NPM_FLOOR" ]; then
+            echo "npm $installed is below the $NPM_FLOOR trusted-publishing floor" >&2
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # The registry's own CLI is a Go binary, pinned rather than floating: the
+      # registry is in preview and its schema is dated for the same reason.
+      - name: Install mcp-publisher
+        env:
+          MCP_PUBLISHER_VERSION: "1.8.1"
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            | tar --extract --gzip --directory /usr/local/bin mcp-publisher
+          mcp-publisher --version
+
+      # The CI half of the login, and the reason `id-token: write` is not the
+      # npm publish's alone. No secret: `github-oidc` exchanges the job's own
+      # token for the `io.github.IIxauII/*` namespace.
+      - name: Log in to the MCP Registry over OIDC
+        run: mcp-publisher login github-oidc
+
+      # Everything else — the drift gate, the npm publish, the tag, the release,
+      # the MCPB asset and the registry submission — is `.releaserc.json`.
+      #
+      # There is no npm token here, and there is not meant to be one: npm
+      # authenticates over OIDC and emits provenance by default. Passing
+      # `--provenance` is the thing that breaks under trusted publishing, so
+      # nothing does (ADR-0005).
+      - name: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npx semantic-release

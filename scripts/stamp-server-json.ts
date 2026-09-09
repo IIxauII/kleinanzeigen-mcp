@@ -128,4 +128,13 @@ export function stampServerJson({
   return result;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) console.log(SERVER_JSON_PATH, stampServerJson().version);
+// The release passes the version it is cutting rather than letting it default
+// to `package.json`'s. Both are the same number when the plugins run in the
+// order `.releaserc.json` lists them — `@semantic-release/npm` bumps the
+// package before this runs — and the argument is what keeps that true if
+// anyone reorders them: a stamp that silently used the previous version would
+// publish a listing pointing at a tag and an asset that do not exist.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const [version] = process.argv.slice(2);
+  console.log(SERVER_JSON_PATH, stampServerJson(version === undefined ? {} : { version }).version);
+}
