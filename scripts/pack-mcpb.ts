@@ -40,9 +40,18 @@ export function mcpb(...args: string[]): string {
  * use. The release attaches this file to a GitHub release and `server.json`
  * points the MCP Registry at that URL by hash (SPEC 8.7, SPEC 9.18), so the
  * name is part of the contract and is always passed explicitly.
+ *
+ * The stem is the **distribution** name, read from `package.json` rather than
+ * written out again: it took §4.6's trademark clip when `kleinanzeigen-mcp`
+ * turned out to be somebody else's package (§8.7), and one statement of it is
+ * what keeps the asset, the tarball and the registry entry agreeing. The
+ * literals in `tests/registry.test.ts` and `tests/cold-install.test.ts` are
+ * deliberately *not* derived this way — a test that computes its expectation
+ * from the code under test cannot fail when that code builds a plausible
+ * wrong name.
  */
 export function mcpbAssetName(version: string): string {
-  return `kanzeigen-mcp-${version}.mcpb`;
+  return `${packageName()}-${version}.mcpb`;
 }
 
 /** Where `pack:mcpb` writes it, and where the registry stamp reads it back. */
@@ -52,7 +61,16 @@ export function defaultMcpbPath(version: string = packageVersion()): string {
 
 /** The version the release is cutting, which `semantic-release` has bumped. */
 function packageVersion(): string {
-  return JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8")).version;
+  return packageManifest().version;
+}
+
+/** The name npm publishes under, which the packed asset is named for. */
+function packageName(): string {
+  return packageManifest().name;
+}
+
+function packageManifest(): { name: string; version: string } {
+  return JSON.parse(readFileSync(new URL("package.json", ROOT), "utf8"));
 }
 
 /**
