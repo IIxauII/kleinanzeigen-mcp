@@ -86,9 +86,24 @@ workflow_dispatch
 
 The publish step authenticates over **OIDC**, not with a token: the job carries `permissions: id-token: write`, runs npm CLI **≥ 11.5.1**, and gets **provenance by default** — no `--provenance` flag, and no `NPM_TOKEN` anywhere in the workflow or the repository's secrets.
 
-`semantic-release` commits back `package.json`, `package-lock.json`, `src/version.ts`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. The two plugin files are in that list because `.mcp.json` pins the exact version it ships against. It commits straight to `main`, which now carries a ruleset — pull request required, force-push and deletion blocked. **A pull-request-required rule refuses that push**, so the ruleset must name the identity the release job pushes as a bypass actor, scoped to it and to nothing else. If that cannot be scoped tightly enough, drop the pull-request rule rather than the other two: on a single-maintainer repository, force-push and deletion blocking are the halves actually protecting anything.
+`semantic-release` commits back `package.json`, `package-lock.json`, `src/version.ts`, `manifest.json`, `CHANGELOG.md`, `plugin/.claude-plugin/plugin.json` and `plugin/.mcp.json`. The two plugin files are in that list because `.mcp.json` pins the exact version it ships against, and `manifest.json` because the MCPB manifest carries its own `version` field that nothing derives from `package.json`. It commits straight to `main`, which now carries a ruleset — pull request required, force-push and deletion blocked. **A pull-request-required rule refuses that push**, so the ruleset must name the identity the release job pushes as a bypass actor, scoped to it and to nothing else. If that cannot be scoped tightly enough, drop the pull-request rule rather than the other two: on a single-maintainer repository, force-push and deletion blocking are the halves actually protecting anything.
 
 **Nothing propagates.** The MCP Registry never polls npm, so a release that skips its step leaves the listing advertising the previous version indefinitely. Publishing to npm is not publishing.
+
+### The MCPB step
+
+```bash
+npm run build            # assembles build/mcpb/ — the staging directory
+npm run pack:mcpb        # → build/kleinanzeigen-mcp-<version>.mcpb
+```
+
+Two things about it are not incidental, and both are pinned by `tests/mcpb.test.ts` rather than left to the procedure.
+
+**The staging directory is the packaging rule.** `mcpb pack` honours neither `.gitignore` nor `package.json:files`, so `mcpb pack .` at the repo root would ship `src/`, `data/`, `scripts/` and the fixtures. `scripts/stage-mcpb.ts` holds the allowlist — six files, nothing else — and the build assembles it. A `.mcpbignore` would be a denylist that fails open, which is the shape of the packaging bug this project already had once.
+
+**The artefact ships unsigned**, and `npm run pack:mcpb` is the whole of the step: there is no `mcpb sign`. `--self-signed` reports success and then fails its own `mcpb verify`, because verification checks the chain against the OS trust store, and it writes its key into `node_modules`, so the identity dies at the next install. The repository is public, so the *"Not signed"* warning is now shown to strangers rather than to the owner — the decision stands ([ADR-0005](./adr/0005-four-channels-one-artifact.md)), and buying a certificate is still nobody's decision.
+
+Upload it to the release **before** the `mcp-publisher` step: the registry does a redirect-refusing `HEAD` on the asset URL, and a `packages[]` entry pointing at an asset that is not there yet fails.
 
 ### Before the first release, once
 

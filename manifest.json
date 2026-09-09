@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "kleinanzeigen-mcp",
+  "display_name": "Kleinanzeigen",
+  "version": "0.1.0",
+  "description": "A read-only, robots-clean MCP server over kleinanzeigen.de",
+  "author": {
+    "name": "Felix",
+    "url": "https://github.com/IIxauII"
+  },
+  "homepage": "https://github.com/IIxauII/kleinanzeigen-mcp",
+  "documentation": "https://github.com/IIxauII/kleinanzeigen-mcp#readme",
+  "support": "https://github.com/IIxauII/kleinanzeigen-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IIxauII/kleinanzeigen-mcp"
+  },
+  "license": "Unlicense",
+  "keywords": ["mcp", "model-context-protocol", "kleinanzeigen", "classifieds", "germany", "read-only"],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "KLEINANZEIGEN_MCP_RATE_LIMIT_MS": "${user_config.rate_limit_ms}"
+      }
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=22"
+    }
+  },
+  "user_config": {
+    "rate_limit_ms": {
+      "type": "number",
+      "title": "Minimum gap between requests (ms)",
+      "description": "How politely the server crawls kleinanzeigen.de. Lower is faster and ruder; it is your machine, your IP and your risk. Leave it alone to keep the 1500 ms default.",
+      "default": 1500,
+      "min": 0,
+      "required": false
+    }
+  }
+}
