@@ -61,10 +61,10 @@ describe("the version stamp", () => {
     expect(stampedTree["src/version.ts"]).toContain('export const VERSION = "9.9.9";');
     expect(JSON.parse(stampedTree["manifest.json"]!).version).toBe("9.9.9");
     expect(JSON.parse(stampedTree["plugin/.claude-plugin/plugin.json"]!).version).toBe("9.9.9");
-    // The pin the plugin ships against: `npx -y kleinanzeigen-mcp@<version>`,
+    // The pin the plugin ships against: `npx -y kanzeigen-mcp@<version>`,
     // exact and never floating (SPEC 8.8).
     expect(JSON.parse(stampedTree["plugin/.mcp.json"]!).mcpServers.kleinanzeigen.args) //
-      .toEqual(["-y", "kleinanzeigen-mcp@9.9.9"]);
+      .toEqual(["-y", "kanzeigen-mcp@9.9.9"]);
   });
 
   it("changes the version and nothing else about any of the four files", () => {

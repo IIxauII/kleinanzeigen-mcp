@@ -2,7 +2,7 @@
 
 **Status:** accepted
 
-kleinanzeigen-mcp is published to **npm** (the primary channel, installed as `npx -y kleinanzeigen-mcp`), listed in the **MCP Registry**, packed as an **MCPB** for Claude Desktop, and offered as a **Claude Code plugin** that bundles the server together with one skill. All four serve the same `dist/index.js` from the same release, cut by **one maintainer-triggered workflow dispatch**, gated by the dataset drift check.
+kleinanzeigen-mcp is published to **npm** (the primary channel, installed as `npx -y kanzeigen-mcp`), listed in the **MCP Registry**, packed as an **MCPB** for Claude Desktop, and offered as a **Claude Code plugin** that bundles the server together with one skill. All four serve the same `dist/index.js` from the same release, cut by **one maintainer-triggered workflow dispatch**, gated by the dataset drift check.
 
 The repository is **public**. The package therefore carries **npm provenance**, published over OIDC by **trusted publishing**, and **no npm token exists anywhere in Actions secrets**.
 
@@ -14,7 +14,11 @@ Three things here are hard to reverse, and one of them runs in the wrong directi
 
 **Two `package.json` fields are immutable the moment the first version publishes.** `"license": "Unlicense"` and `"mcpName": "io.github.IIxauII/kleinanzeigen"` cannot be added, corrected or re-cased afterwards — npm version metadata is frozen, so a mistake costs a version bump rather than a commit. `mcpName` is the string the MCP Registry reads out of npm to prove the package belongs to the authenticated namespace, and its casing is *inferred from the registry's source*, not documented: `io.github.%s/*` is formatted from the GitHub login verbatim, with no case folding anywhere in the matching path. `IIxauII` is therefore load-bearing, and the first publish attempt is where it gets confirmed against a real 403.
 
-**Publishing claims a name.** `kleinanzeigen-mcp` on npm and `io.github.IIxauII/kleinanzeigen` in the registry are permanent identities for a tool that reads a site whose terms of service, on the site's own reading, forbid it (§12). That is a deliberate act of standing behind the position rather than a packaging step.
+**Publishing claims a name.** `kanzeigen-mcp` on npm and `io.github.IIxauII/kleinanzeigen` in the registry are permanent identities for a tool that reads a site whose terms of service, on the site's own reading, forbid it (§12). That is a deliberate act of standing behind the position rather than a packaging step.
+
+**And the name it claims on npm is not the project's own, because that one was taken** ([#74](https://github.com/IIxauII/kleinanzeigen-mcp/issues/74)). `kleinanzeigen-mcp` on npm is a real, functioning, independently written MCP server over the same site, published first by someone else — so the line this ADR calls the primary channel fetched a stranger's server, and the bootstrap below would have 403'd on step 1. A dispute was rejected out of hand: npm does not transfer a name away from a package that is really using it. The distribution therefore takes the same trademark clip every plugin slug already takes.
+
+**What deliberately did not move with it is the project identity.** The User-Agent token stays `kleinanzeigen-mcp/<version>`, `serverInfo.name` stays with it, and the repository, its URL and `mcpName` are untouched — the registry authenticates the namespace against the GitHub account and reads `mcpName` out of npm metadata, so neither depends on what the package is called. The reasoning is the split below: the **identify** half is what a site operator blocks, and a package rename is no reason to touch it.
 
 **And the publish credential cannot be configured until after the first publish.** Trusted publishing is a per-package setting on npmjs.com, and the settings page does not exist for a package that does not exist. Every other sequencing constraint on this project points backwards — get it right *before* the first publish, or pay a version bump. This one points forwards, and its resolution is a version on npm that nobody is meant to install. That deserves its own section.
 
@@ -27,11 +31,11 @@ So: **no npm token ever enters Actions secrets.** On our side the whole of the s
 **The bootstrap is a hand-published `0.0.1`, deprecated on arrival.** In order:
 
 1. `npm publish` a stub `0.0.1` from a maintainer's machine — with `"license"` and `"mcpName"` already correct, because it is a real publish and the immutable fields freeze on it too.
-2. Configure trusted publishing at `npmjs.com/package/kleinanzeigen-mcp/access`, pointing at this repository and the release workflow.
-3. `npm deprecate kleinanzeigen-mcp@0.0.1` with a message that says what it is.
+2. Configure trusted publishing at `npmjs.com/package/kanzeigen-mcp/access`, pointing at this repository and the release workflow.
+3. `npm deprecate kanzeigen-mcp@0.0.1` with a message that says what it is.
 4. Dispatch the release. CI publishes **`0.2.0`, with provenance**, and `latest` moves to it.
 
-Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the real release lands, and the deprecation warning explains the one on the shelf behind it.
+Nobody installs the placeholder: `npx -y kanzeigen-mcp` resolves `latest`, which is `0.2.0` from the moment the real release lands, and the deprecation warning explains the one on the shelf behind it.
 
 The alternatives, and why each is worse:
 
@@ -68,7 +72,7 @@ npm and the Registry were never affected either way: the package is public regar
 
 - **MCPB is the only way a Claude Desktop user installs this without hand-editing JSON.** `claude mcp` has no `.mcpb` path, so it is not a second route into Claude Code. The channels overlap far less than they look.
 - **The MCP Registry is where an agent or a client goes looking**, and it costs one file and one CLI call. It is free, automated and unreviewed.
-- **The Claude Code plugin exists for the skill, not for the server.** `claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp` already installs the server in one line; what bundling buys is that the skill arrives *with* it. The skill carries the six things the tool descriptions cannot (§8.8) — resolver-first ordering, the null resolution on a colliding location, `total` against `reachable`, dedupe on ad id — and those are quiet failures, the kind a user never reports because the answer looked fine.
+- **The Claude Code plugin exists for the skill, not for the server.** `claude mcp add kleinanzeigen -- npx -y kanzeigen-mcp` already installs the server in one line; what bundling buys is that the skill arrives *with* it. The skill carries the six things the tool descriptions cannot (§8.8) — resolver-first ordering, the null resolution on a colliding location, `total` against `reachable`, dedupe on ad id — and those are quiet failures, the kind a user never reports because the answer looked fine.
 
 Each channel is a version that must be published separately: nothing propagates. That is the recurring cost, and it is why there is exactly one dispatch rather than four procedures.
 

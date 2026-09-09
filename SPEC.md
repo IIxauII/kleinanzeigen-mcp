@@ -845,7 +845,7 @@ The live category set was **159 as of 2026-09-08**, byte-for-byte the count in `
 - **TypeScript**, chosen for the **domain model, not the runtime**: the price tagged union (§3.1) and the listing flags (§3.4) get compile-time exhaustiveness on every `switch`. Since the whole point of the price union is that "negotiable with no number" can never be read as "free", having the compiler enforce it beats having a test enforce it.
 - **Node ≥ 22.** Node 20 went EOL in April 2026; 22 is in maintenance, 24 is active LTS. 22 keeps the door open for anyone not yet on 24. Node 22 also ships full ICU, which is what makes §3.2's `Europe/Berlin` normalisation free.
 - **Three build-time dependencies, inlined: `@modelcontextprotocol/server`, `zod`, `cheerio`.** `zod` is not new — the SDK already requires it for tool schemas. `cheerio` earns its place because §5.8 makes parse failure a loud, breaker-adjacent event, and hand-rolled regex extraction would be the most brittle thing to hang that rule on; every anchor in §5.1 is a plain CSS selector.
-- **The published package declares no `dependencies` at all**, and this is the correction of a real defect rather than a tidy-up. §8.2's `noExternal: [/.*/]` already inlines all three into the bundle, yet the manifest declared them — so every `npx -y kleinanzeigen-mcp` cold start downloaded **110 packages, 4 750 files, 33 MB** for code already sitting in the 3.4 MB tarball. Ten times the artifact, for nothing, on the primary install channel. All three are `devDependencies`. **This is safe only because §8.6's cold-install verification proves the installed bundle resolves nothing at runtime**; the two decisions are load-bearing on each other, and neither may be removed alone.
+- **The published package declares no `dependencies` at all**, and this is the correction of a real defect rather than a tidy-up. §8.2's `noExternal: [/.*/]` already inlines all three into the bundle, yet the manifest declared them — so every `npx -y kanzeigen-mcp` cold start downloaded **110 packages, 4 750 files, 33 MB** for code already sitting in the 3.4 MB tarball. Ten times the artifact, for nothing, on the primary install channel. All three are `devDependencies`. **This is safe only because §8.6's cold-install verification proves the installed bundle resolves nothing at runtime**; the two decisions are load-bearing on each other, and neither may be removed alone.
 - **`@modelcontextprotocol/client` is test-only.** It is imported by the in-process handshake tests and by nothing under `src/`. It belongs in `devDependencies` for that reason, independently of the inlining above.
 - **No HTTP client dependency.** Node's built-in `fetch` suffices: blocking is IP-reputation and volume driven, not request-shape driven, so finer header or HTTP/2 control buys nothing.
 
@@ -883,7 +883,7 @@ The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would m
 
 | Channel | Who it is for | How |
 | --- | --- | --- |
-| **npm / npx** — primary | anyone with an MCP client | `npx -y kleinanzeigen-mcp`, no install step |
+| **npm / npx** — primary | anyone with an MCP client | `npx -y kanzeigen-mcp`, no install step |
 | **MCPB** | Claude Desktop | a downloaded `.mcpb`, opened |
 | **Claude Code plugin** | Claude Code | `/plugin marketplace add`, server + skill together (§8.8) |
 | **run-from-clone** | development | `git clone && npm install && npm run build` |
@@ -891,10 +891,10 @@ The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would m
 In Claude Code the one-line form is:
 
 ```bash
-claude mcp add kleinanzeigen -- npx -y kleinanzeigen-mcp
+claude mcp add kleinanzeigen -- npx -y kanzeigen-mcp
 ```
 
-local scope by default; `--scope user` / `--scope project` for the others, and any env assignment goes **before** the `--`. In a client that takes a JSON config block, `command: "npx"`, `args: ["-y", "kleinanzeigen-mcp"]`.
+local scope by default; `--scope user` / `--scope project` for the others, and any env assignment goes **before** the `--`. In a client that takes a JSON config block, `command: "npx"`, `args: ["-y", "kanzeigen-mcp"]`.
 
 **Run-from-clone is no longer the packaging posture** — it is the development path, and it is the only one that yields a tree the drift check and the fixture-capture scripts can run in:
 
@@ -955,8 +955,8 @@ Verbatim capture was rejected (it republishes real ads and real personal data un
 
 ```
 npm pack                                     # prepack builds
-npm i ./kleinanzeigen-mcp-*.tgz --prefix $TMP
-$TMP/node_modules/.bin/kleinanzeigen-mcp
+npm i ./kanzeigen-mcp-*.tgz --prefix $TMP
+$TMP/node_modules/.bin/kanzeigen-mcp
   ├─ stderr: exactly one server_started line
   ├─ stdout: transport only, nothing else, ever
   ├─ a real MCP initialize handshake
@@ -1002,6 +1002,14 @@ The split earns its keep: after a removal, an argument that resolved against the
 
 **Tags start at `v0.1.0` on current `main`.** With zero tags, `semantic-release` reads *no previous release* and emits `1.0.0` — a stability promise this project cannot back. `v0.1.0` is simply true (`package.json` and `src/version.ts` both say so) and was never published, so it exists only as a git tag. The v2 SDK migration is a `feat:`, which makes **the first version ever published to npm `0.2.0`**.
 
+> **Correction, recorded while verifying the install lines by hand ([#74](https://github.com/IIxauII/kleinanzeigen-mcp/issues/74)).** **The npm name is `kanzeigen-mcp`, because `kleinanzeigen-mcp` was already taken.** It belongs to a real, functioning, independently written MCP server over the same site, published 2026-09-01 by `taneron` — not a squat, and first. Two consequences, and both were blocking: `npx -y kleinanzeigen-mcp` fetches a stranger's server on the channel §8.3 makes primary, and the bootstrap publish below would 403 before step 1 finished. A dispute was considered and rejected — npm does not transfer a name away from a package that is really using it.
+>
+> The rename splits two identities that used to be spelled the same, and **only the distribution identity moves**: `package.json`'s `name` and `bin` key, `server.json`'s npm identifier and MCPB asset URL, `manifest.json`'s `name`, the plugin's exact pin, and every install line in this document and the README.
+>
+> **The project identity does not move, and that is the load-bearing half.** The User-Agent token stays `kleinanzeigen-mcp/<version>` (§8.5, [ADR-0003](./docs/adr/0003-non-circumvention.md)) — it is a hardcoded literal that no packaging value derives from, and it is what a site operator writes a block rule against, so changing it costs the **identify** half of the non-circumvention argument and buys nothing. `serverInfo.name` (§4.6) stays with it, on the same wire. So do the repository, its URL, `homepage`, `bugs`, the titles of this document and the README, and **`mcpName: io.github.IIxauII/kleinanzeigen`** — the registry authenticates the namespace against the GitHub account and reads `mcpName` out of the npm metadata, and neither depends on what the package is called.
+>
+> `tests/packaging.test.ts` pins the split from both ends, so a later blanket rename across the repository fails rather than lands.
+
 **Two `package.json` fields are immutable once published and must be right before the first `npm publish`:**
 
 - `"license": "Unlicense"` — the licence decision, recorded in the README rather than in an ADR.
@@ -1012,11 +1020,11 @@ npm metadata is immutable; retrofitting either field is not a follow-up commit. 
 **And one sequencing constraint of the same class points the other way: trusted publishing cannot be configured until the package exists.** It is a per-package setting on npmjs.com, and the settings page does not exist for a package that does not, so **the first artifact on npm cannot be the one CI publishes.** The resolution is a hand-published, immediately deprecated stub:
 
 1. `npm publish` a stub **`0.0.1`** from a maintainer's machine, with `license` and `mcpName` already correct — it is a real publish and they freeze on it too. npm publishes the version `package.json` carries, so `package.json` and `src/version.ts` go to `0.0.1` for that publish and are reverted uncommitted; `v0.1.0` stays a tag that was never published.
-2. Configure trusted publishing at `npmjs.com/package/kleinanzeigen-mcp/access`, pointing at this repository and the release workflow.
-3. `npm deprecate kleinanzeigen-mcp@0.0.1`, with a message saying it is a bootstrap placeholder.
+2. Configure trusted publishing at `npmjs.com/package/kanzeigen-mcp/access`, pointing at this repository and the release workflow.
+3. `npm deprecate kanzeigen-mcp@0.0.1`, with a message saying it is a bootstrap placeholder.
 4. Dispatch. CI publishes **`0.2.0` with provenance**, and `latest` moves to it.
 
-This is recorded beside the immutable fields rather than filed in the procedure because it is the same kind of thing — a step whose wrong ordering costs a version number — and it is the only one that has to be taken **after** the first publish rather than before. Nobody installs the placeholder: `npx -y kleinanzeigen-mcp` resolves `latest`.
+This is recorded beside the immutable fields rather than filed in the procedure because it is the same kind of thing — a step whose wrong ordering costs a version number — and it is the only one that has to be taken **after** the first publish rather than before. Nobody installs the placeholder: `npx -y kanzeigen-mcp` resolves `latest`.
 
 **`server.json` for the MCP Registry** carries `$schema`, `name`, `title`, `description` (≤ 100 characters, schema-enforced), `version`, `repository`, `websiteUrl` and `packages[]`. npm and MCPB coexist in one `packages[]` entry. The MCPB entry needs a GitHub release-asset URL containing `mcp`, over https, with `fileSha256` **required** — and the registry does a redirect-refusing `HEAD` on it, so the asset must be uploaded before the registry step runs. The registry never verifies the hash; clients do, so a wrong hash publishes cleanly and fails every install. Listing is free, automated and unreviewed; there is no licence field, no category, and no disclosure form.
 
@@ -1051,9 +1059,9 @@ plugin/
 
 **`source: "./"` is refused.** It makes the whole repository the plugin, so `/plugin marketplace add` drags `src/`, `tests/`, `data/` and 77 863 lines of `dist/` onto every user's disk. The subdirectory payload is three files.
 
-**Every slug the plugin owns takes §4.6's trademark clip** — plugin `kanzeigen`, marketplace `kanzeigen`, skill directory `searching-kanzeigen` — and the discoverability cost of not matching the npm name `kleinanzeigen-mcp` is accepted. The clip stops at prose: the skill's **description must contain "kleinanzeigen.de"**, because that string is what makes it trigger, and naming the site you read is descriptive use. `plugin.json` takes §4.6's one description string, which is now shared across five slots.
+**Every slug the plugin owns takes §4.6's trademark clip** — plugin `kanzeigen`, marketplace `kanzeigen`, skill directory `searching-kanzeigen` — and so, since §8.7's rename, does the npm name `kanzeigen-mcp`, which these now match. The clip stops at prose: the skill's **description must contain "kleinanzeigen.de"**, because that string is what makes it trigger, and naming the site you read is descriptive use. `plugin.json` takes §4.6's one description string, which is now shared across five slots.
 
-**`.mcp.json` pins the version exactly** — `npx -y kleinanzeigen-mcp@<version>`, never floating. The skill below describes a result *shape*; a floating server under a fixed skill means the first output-shape change silently invalidates the skill's text. That pin is why `plugin.json` and `.mcp.json` are committed back by the release (§8.7).
+**`.mcp.json` pins the version exactly** — `npx -y kanzeigen-mcp@<version>`, never floating. The skill below describes a result *shape*; a floating server under a fixed skill means the first output-shape change silently invalidates the skill's text. That pin is why `plugin.json` and `.mcp.json` are committed back by the release (§8.7).
 
 **`.mcp.json` carries no `env` block at all.** A plugin manifest has no MCPB-style `user_config`, so anything written there is static for every user — and the block *overrides* the environment. Writing `"KLEINANZEIGEN_MCP_RATE_LIMIT_MS": "1500"` for visibility would **break the one knob a plugin user has**; omitting it is the only way an exported value still reaches the server, which then falls back to its own default (§8.4).
 
