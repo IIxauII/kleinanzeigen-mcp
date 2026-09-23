@@ -115,7 +115,7 @@ Two escapes are **noticed and deliberately not taken**, because the tool would h
 
 - **25 organic listings per page × 50 pages = 1 250 organic listings per query.** Measured, not assumed.
 - **TOP listings are extra**, up to 2 per page, consuming no result slot — so a page reporting `51 - 75` can carry 27 rows. They are not constant: 2/page on broad queries, **0/page** on narrow ones.
-- **Page 50 is the last honest page, and the clamp is quiet.** Page 51+ answer with page 50's full 27 plausible rows and no error; deeper still (page 1000) the range resets to page 1's. Since the redesign the re-serve arrives as a **302**, not as a 200 on the URL asked for — see the correction below; quiet is the property that matters, and it is unchanged.
+- **Page 50 is the last honest page, and the clamp is silent.** Page 51+ answer with page 50's full 27 plausible rows and no error; deeper still (page 1000) the range resets to page 1's. Since the redesign the re-serve arrives as a **302**, not as a 200 on the URL asked for — see the correction below; silent here means no error and a full page of plausible rows, and that is unchanged.
 
 | page | reported range | expected start |
 | --- | --- | --- |
@@ -646,7 +646,7 @@ These have appeared identically across five languages of scraper spanning 2021�
 | Anchor | Reads |
 | --- | --- |
 | `#srchrslt-adtable` | the results container |
-| its direct `li` children | a row slot — **several per page (5–7 across the recaptured fixtures) carry no `data-adid` and are ad banners; drop them silently** |
+| its direct `li` children | a row slot — **several per page (5–7 across the recaptured fixtures that have results) carry no `data-adid` and are ad banners; drop them silently** |
 | `article[data-adid]` | a listing row; `data-adid` is the ad id |
 | a slot's direct child `<svg>` | the corner ribbon marking a TOP listing → `promoted: true` |
 | `#srp-breadcrumb-summary` | `N - M von T` — **numbers only**, see §5.5 |

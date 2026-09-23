@@ -116,7 +116,7 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
 
     const article = $li.find("article[data-adid]").first();
     if (article.length === 0) {
-      // An ad banner: 5–7 per page here, dropped silently by the parser (SPEC 5.1).
+      // An ad banner: 5–7 on a page with results, dropped silently by the parser (SPEC 5.1).
       // The slot is kept so the fixture still contains what has to be dropped.
       rows.push($.html($li));
       return;

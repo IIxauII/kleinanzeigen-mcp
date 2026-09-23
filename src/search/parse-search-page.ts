@@ -221,8 +221,8 @@ export function parseSearchPage(body: string, options: ParseOptions): SearchPage
     const li = $(slot);
     const article = li.find("article[data-adid]").first();
     // Several slots per page carry no ad id — 5 to 7 across the recaptured
-    // fixtures. They are ad banners, not listings, and they are dropped
-    // **silently** (SPEC 5.1).
+    // fixtures that have results. They are ad banners, not listings, and they
+    // are dropped **silently** (SPEC 5.1).
     if (article.length === 0) return;
     // A TOP row is marked by its corner-ribbon `<svg>`, a direct child of the
     // slot; an organic row has no direct `<svg>` child. The ribbon carries no

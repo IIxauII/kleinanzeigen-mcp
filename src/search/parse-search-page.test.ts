@@ -8,8 +8,12 @@ import { ORIGIN } from "./search-url.ts";
  * The fixtures are captured live and minimised by `npm run
  * capture:search-fixtures` (SPEC 8.6); `fixture`, `rewrite` and `withSummary`
  * live in `tests/search-fixture.ts` because the tool tests need the same
- * doctoring. Every count asserted below is the live page's own: 34 slots, 27 of
- * them listings, 2 of those promoted.
+ * doctoring.
+ *
+ * Every count asserted below is its own page's. They are not one set of
+ * numbers: `search-page-1` is 34 slots, 27 listings, 2 of those promoted, while
+ * a narrow query carries fewer slots and no promoted row at all. What holds
+ * across all of them is the 25 organic rows of a full page (SPEC 2.4).
  */
 
 /** Fixed so `Heute` and `Gestern` resolve against a known Berlin day. */
@@ -148,13 +152,14 @@ describe("TOP listings", () => {
     expect(listings).toHaveLength(27);
   });
 
-  it("stay a handful per page: every fixture carries its full 25 organic rows", () => {
+  it("never eat an organic row: every fixture carries its full 25 of them", () => {
     // The marker is structural — a direct-child `<svg>` — so a second one (a
     // watchlist heart, say) would read as promoted and this is what would
-    // notice. A page's organic rows are its page size: 25 on every fixture
-    // captured, whatever the query (SPEC 4.3). A row mismarked as promoted
-    // takes one off that count, so the invariant is sharper than a bound on
-    // `promoted_count` alone.
+    // notice. A page's organic rows are its page size: SPEC 2.4's "25 organic
+    // listings per page", which §2.4 also says a clamped page carries in full,
+    // so every fixture here has 25 whatever its query. A row mismarked as
+    // promoted takes one off that count, which makes this sharper than a bound
+    // on `promoted_count` alone.
     for (const name of [
       "search-page-1",
       "search-page-50",

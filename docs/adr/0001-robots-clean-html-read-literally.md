@@ -4,6 +4,8 @@
 
 kleinanzeigen.de has a better machine-readable source than its website: `api.kleinanzeigen.de`, the mobile app's JSON API, answers a plain `curl` with a credential baked into the APK and returns typed fields, GPS coordinates, ISO timestamps, exact counts and **no page cap**. We do not use it, because `robots.txt` says `Disallow: /api`. We read the HTML site instead, restricted to URLs matched by no `Disallow` under `User-agent: *` — and we read that file **literally**: a URL the file does not match is a URL the file did not fence, regardless of what the surrounding rules appear to be reaching for.
 
+**Amended in place rather than superseded: one of the three paths below is no longer exercised.** Since [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) the slugless `/s-seite:N/…` pagination form is **not constructed** — the redesign moved paging to a `?pageNum=` query on a slugged path, and the `seite:50` form now arrives only as the page-50 clamp's own redirect, which is followed and never emitted (SPEC 2.3, 2.4). Nothing in the reasoning changes: the path was taken on the literal rule and remains defensible under it, and the grammar simply stopped needing the most contentious of the three. It is kept legible because a reader meeting the literal rule should see which of its consequences were exercised and which lapsed on their own.
+
 ## Why this is worth recording
 
 Every expensive thing about this project follows from it: the 1 250-result ceiling, the silent page-50 clamp, the three-decoder parser, the drift between pages, the missing radius sort, the missing attribute filters, and a DOM contract we do not own. A future reader looking at 500 lines of cheerio selectors and a stateless clamp detector will reasonably ask why we did not spend an afternoon on the JSON API instead. This is the answer.
@@ -19,7 +21,7 @@ So the rule became literal. **Unmatched by any `Disallow` means allowed.** Inten
 Consequences of the switch, in both directions:
 
 - The 5-page cap fell, and the ceiling rose from ≈130 to **1 250** organic listings per query.
-- Three unmatched paths are taken deliberately: slugless `/s-seite:N/…` pagination, `…brandProfile.getAds`, and `…brandingIndex.searchBrandings`. **Since [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) the first of those is no longer constructed** — the redesign made paging a `?pageNum=` query on a slugged path, and the `seite:50` form now only arrives as the clamp's own redirect, followed and never emitted (SPEC 2.3, 2.4). The reasoning below is unchanged and stands as the record: the path was taken on the literal rule, and dropping it cost nothing the rule granted. None of `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` or `/pro/` appears anywhere in the file's 252 `*` rules.
+- Three unmatched paths are taken deliberately: slugless `/s-seite:N/…` pagination, `…brandProfile.getAds`, and `…brandingIndex.searchBrandings`. None of `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` or `/pro/` appears anywhere in the file's 252 `*` rules.
 - The `r{km}` radius question went moot rather than being won — `?radius=` covers radius entirely on any allowed URL, so nothing rode on the path spelling either way.
 - Nothing else reopened. The refusals of `/api`, `/s-kategorie-baum.html` and `/s-suchanfrage.html` rest on rules the file actually wrote.
 
