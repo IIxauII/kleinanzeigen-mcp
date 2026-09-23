@@ -13,16 +13,33 @@ const fixture = (name: string): string =>
   readFileSync(new URL(`../../tests/fixtures/${name}.html`, import.meta.url), "utf8");
 
 /** Fixed so `Heute` and `Gestern` resolve against a known Berlin day. */
-const NOW = new Date("2026-08-25T12:00:00Z");
+const NOW = new Date("2026-09-23T12:00:00Z");
 
 const parse = (name: string, page = 1, degenerateForm = false) =>
   parseSearchPage(fixture(name), { page, degenerateForm, now: NOW });
 
+/**
+ * A fixture with the summary the parser reads rewritten to `summary`, anchored
+ * on **the element** rather than on the fixture's own counts.
+ *
+ * Anchoring on a count is what let the degenerate-signature guard rot: the
+ * literal `39.183` stopped matching the moment the fixture was recaptured, the
+ * replace became a silent no-op, and the test went on passing against an
+ * undoctored page ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).
+ * Throwing when nothing was rewritten is what makes that failure loud instead.
+ */
+function withSummary(name: string, summary: string): string {
+  const page = fixture(name);
+  const doctored = page.replace(/(id="srp-breadcrumb-summary"[^>]*>)[^<]*/u, `$1${summary}`);
+  if (doctored === page) throw new Error(`${name}: no #srp-breadcrumb-summary to rewrite`);
+  return doctored;
+}
+
 describe("the rows of a search results page", () => {
   it("drops the slots that carry no ad id, silently", () => {
-    // 34 `li.ad-listitem` on the live page, 7 of them ad banners (SPEC 5.1).
+    // 34 `<li>` on the live page, 7 of them ad banners (SPEC 5.1).
     const page = parse("search-page-1");
-    expect(fixture("search-page-1").match(/class="ad-listitem/gu)).toHaveLength(34);
+    expect(fixture("search-page-1").match(/<li /gu)).toHaveLength(34);
     expect(page.listings).toHaveLength(27);
     expect(page.listings.every((listing) => listing.ad_id !== "")).toBe(true);
   });
@@ -36,18 +53,18 @@ describe("the rows of a search results page", () => {
       // The ~200-character text off the row's `ld+json`, not the shorter
       // visible snippet (SPEC 5.1).
       description: expect.stringContaining("Er ist lang genug"),
-      price: { kind: "Negotiable", amount: 380 },
-      old_price: { kind: "Fixed", amount: 450 },
+      price: { kind: "Fixed", amount: 1500 },
+      old_price: { kind: "Fixed", amount: 1800 },
       postcode: "10548",
       location_name: "Bad Grönenbach",
-      posted: { value: "2026-08-25T14:14:00+02:00", precision: "minute" },
+      posted: { value: "2026-09-23T16:58:00+02:00", precision: "minute" },
       thumbnail: expect.stringContaining("rule=$_2.AUTO"),
-      image_count: 9,
+      image_count: 16,
       shipping: false,
       listing_type: "OFFER",
       promoted: false,
       // Rendered only under an active radius, which this page was fetched with.
-      distance_km: 3,
+      distance_km: 4,
     });
     expect(listing.description.length).toBeGreaterThan(190);
   });
@@ -64,7 +81,7 @@ describe("the rows of a search results page", () => {
 
   it("counts a row's images off the gallery counter, and a counterless row as one", () => {
     const counts = parse("search-page-1").listings.map((listing) => listing.image_count);
-    expect(counts).toContain(18);
+    expect(counts).toContain(20);
     expect(counts).toContain(1);
     expect(counts.every((count) => Number.isInteger(count) && count >= 0)).toBe(true);
   });
@@ -109,18 +126,18 @@ describe("the rows of a search results page", () => {
 
   it("reads both posting-date precisions off one page", () => {
     const posted = parse("search-old-dates").listings.map((listing) => listing.posted);
-    expect(posted).toContainEqual({ value: "2026-08-25T14:14:00+02:00", precision: "minute" });
-    expect(posted).toContainEqual({ value: "2026-08-24T22:00:00+02:00", precision: "minute" });
-    expect(posted).toContainEqual({ value: "2026-08-23", precision: "day" });
+    expect(posted).toContainEqual({ value: "2026-09-22T21:25:00+02:00", precision: "minute" });
+    expect(posted).toContainEqual({ value: "2026-09-21", precision: "day" });
   });
 
-  it("reads the unlinked heading the site renders on a sizeable minority of rows", () => {
-    // `<h2><span class="ellipsis ref-not-linked" data-url="…">` rather than
-    // `<h2><a href="…">`. Reading only the anchor made one such row a
-    // `ParseError` that failed the whole page, and 9 of this fixture's 27 rows
-    // are unlinked.
+  it("reads the unlinked heading the site renders on a minority of rows", () => {
+    // `<h3><span name="<ad id>" data-url="…">` rather than `<h3><a href="…">`.
+    // Reading only the anchor made one such row a `ParseError` that failed the
+    // whole page, and 3 of this fixture's 27 rows are unlinked. Counted on
+    // `data-url`, which is what the parser reads, rather than on the utility
+    // class beside it, which it does not.
     const body = fixture("search-unlinked-title");
-    expect(body.match(/ref-not-linked/gu)).toHaveLength(9);
+    expect(body.match(/<span[^>]*\sdata-url=/gu)).toHaveLength(3);
     const page = parse("search-unlinked-title");
     expect(page.listings).toHaveLength(27);
     expect(page.listings.every((listing) => listing.title !== "")).toBe(true);
@@ -157,9 +174,9 @@ describe("TOP listings", () => {
 
 describe("the results summary", () => {
   it("is read as numbers and nothing else", () => {
-    expect(parse("search-page-1")).toMatchObject({ total: 39183, range: { from: 1, to: 25 } });
+    expect(parse("search-page-1")).toMatchObject({ total: 38995, range: { from: 1, to: 25 } });
     expect(parse("search-page-50", 50)).toMatchObject({
-      total: 931917,
+      total: 911990,
       range: { from: 1226, to: 1250 },
     });
   });
@@ -167,10 +184,7 @@ describe("the results summary", () => {
   it("never reads the trailing noun phrase, which is a live label bug", () => {
     // `/s-sammeln/c234` renders `… von 2.293.257 Comics in Deutschland` for a
     // category that is not Comics. Nothing in the result may echo it (SPEC 5.5).
-    const doctored = fixture("search-page-1").replace(
-      /1 - 25 von 39\.183[^<]*/u,
-      "1 - 25 von 2.293.257 Comics in Deutschland",
-    );
+    const doctored = withSummary("search-page-1", "1 - 25 von 2.293.257 Comics in Deutschland");
     const page = parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW });
     expect(page.total).toBe(2293257);
     expect(JSON.stringify(page)).not.toContain("Comics");
@@ -187,14 +201,14 @@ describe("the results summary", () => {
         '<div class="browsebox"><span class="j-count">793.124</span></div></body>',
       );
     const page = parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW });
-    expect(page.total).toBe(39183);
+    expect(page.total).toBe(38995);
   });
 });
 
 describe("the page-50 clamp", () => {
   it("is detected statelessly, from the page asked for and the range reported", () => {
-    // Page 51 re-serves page 50 at HTTP 200 with a full, plausible page
-    // (SPEC 2.4).
+    // Page 51 answers with a 302 to page 50 — a full, plausible page
+    // (SPEC 2.4). The fixture is that final page, captured through the redirect.
     expect(parse("search-page-51-clamped", 51).clamped).toBe(true);
     expect(parse("search-page-50", 50).clamped).toBe(false);
     expect(parse("search-page-1", 1).clamped).toBe(false);
@@ -232,21 +246,21 @@ describe("an empty result", () => {
 
 describe("the loud failures", () => {
   it("throws when the summary is gone", () => {
-    const doctored = fixture("search-page-1").replaceAll("breadcrump-summary", "moved-on");
+    const doctored = fixture("search-page-1").replaceAll("srp-breadcrumb-summary", "moved-on");
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false })).toThrow(ParseError);
   });
 
   it("throws when the summary carries no range", () => {
-    const doctored = fixture("search-page-1").replace(/1 - 25 von 39\.183[^<]*/u, "Ergebnisse");
+    const doctored = withSummary("search-page-1", "Ergebnisse");
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false })).toThrow(ParseError);
   });
 
   it("throws when an organic row lost its date cell, which only a TOP row honestly lacks", () => {
-    // A TOP row's empty date cell is normal; the same emptiness on an organic
+    // A TOP row's missing date is normal; the same emptiness on an organic
     // row is a DOM change and must not arrive as null (SPEC 3.3's correction).
     const doctored = fixture("search-page-1").replaceAll(
-      /<i class="icon icon-small icon-calendar-open"[^>]*><\/i>\s*(Heute|Gestern)[^\n<]*/gu,
-      "",
+      /<span>(?:Heute|Gestern)[^<]*<\/span>/gu,
+      "<span></span>",
     );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /organic row \d+ has no posting date/u,
@@ -257,8 +271,8 @@ describe("the loud failures", () => {
     // Losing the anchor is the site's own unlinked variant and normal; losing
     // both it and the unlinked span is a DOM change, and shouts (SPEC 5.8).
     const doctored = fixture("search-unlinked-title").replaceAll(
-      /<h2 class="text-module-begin">[\s\S]*?<\/h2>/gu,
-      '<h2 class="text-module-begin"></h2>',
+      /<h3[^>]*>[\s\S]*?<\/h3>/gu,
+      "<h3></h3>",
     );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /row \d+ has no title/u,
@@ -268,7 +282,10 @@ describe("the loud failures", () => {
   it("throws when a row has a description on neither surface", () => {
     const doctored = fixture("search-page-1")
       .replaceAll(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gu, "")
-      .replaceAll(/<p class="aditem-main--middle--description">[\s\S]*?<\/p>/gu, "");
+      .replaceAll(
+        /<p class="mb-xsmall text-bodyRegular text-onSurfaceSubdued">[\s\S]*?<\/p>/gu,
+        "",
+      );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /has no description on either surface/u,
     );
@@ -286,7 +303,7 @@ describe("the loud failures", () => {
   it("throws on the degenerate `1 - 1 von 1` signature, never returning it as data", () => {
     // A bare category or location holds thousands of listings, so exactly one
     // is not a number that query can honestly produce (SPEC 5.7).
-    const doctored = fixture("search-page-1").replace(/1 - 25 von 39\.183[^<]*/u, "1 - 1 von 1");
+    const doctored = withSummary("search-page-1", "1 - 1 von 1");
     const options = { page: 1, now: NOW };
     expect(() => parseSearchPage(doctored, { ...options, degenerateForm: true })).toThrow(
       ParseError,

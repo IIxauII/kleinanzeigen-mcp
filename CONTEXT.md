@@ -254,7 +254,7 @@ A listing offering an exchange rather than a sale. Likewise a category.
 
 ## Terms to avoid, and why
 
-- **"Ad"** for a listing. The page's own markup uses ad-listitem for advertising slots that are not listings at all, so the word is already taken. Say **listing**.
+- **"Ad"** for a listing. The results page mixes advertising slots in among the listings — they are row slots carrying no `data-adid`, and are dropped — so the word is already taken by the thing a listing is not. Say **listing**.
 - **"VIP", "SRP", "liberty", "Belen"** — kleinanzeigen's internal names. Useful when reading their HTML, never in ours.
 - **"User id"** for the third number in a listing URL. It is the **location id**.
 - **"Sold"**, **"available"**, **"in stock"** — imply a published inventory state that does not exist.

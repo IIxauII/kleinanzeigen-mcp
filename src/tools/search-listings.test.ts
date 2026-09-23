@@ -12,6 +12,19 @@ const fixture = (name: string): string =>
 
 const dataset = () => loadCityDataset(new URL("../../data/cities.json", import.meta.url));
 
+/**
+ * A fixture with the summary the parser reads rewritten, anchored on **the
+ * element** rather than on the fixture's own counts — and loud when it
+ * rewrites nothing. See the twin in `parse-search-page.test.ts`: a count-
+ * anchored replace is what silently disarmed this very test (#81).
+ */
+function withSummary(name: string, summary: string): string {
+  const page = fixture(name);
+  const doctored = page.replace(/(id="srp-breadcrumb-summary"[^>]*>)[^<]*/u, `$1${summary}`);
+  if (doctored === page) throw new Error(`${name}: no #srp-breadcrumb-summary to rewrite`);
+  return doctored;
+}
+
 let requested: string[];
 
 /** Every page answers with the same fixture unless a test says otherwise. */
@@ -87,16 +100,16 @@ describe("search_listings over MCP", () => {
   it("addresses page N directly, with the keyword on the query string", async () => {
     const client = await connect(serving(fixture("search-page-50")));
     await search(client, { keywords: "fahrrad", page: 50 });
-    expect(requested).toEqual(["https://www.kleinanzeigen.de/s-seite:50/k0?keywords=fahrrad"]);
+    expect(requested).toEqual(["https://www.kleinanzeigen.de/s-suche/k0?keywords=fahrrad&pageNum=50"]);
   });
 
   it("states the total and the reachable ceiling as two separate numbers", async () => {
-    // `reachable: 1250` against `total: 39183` is the number that tells an
+    // `reachable: 1250` against `total: 38995` is the number that tells an
     // agent to narrow rather than walk 50 pages. Collapsing them into
     // `min(stated, 1250)` is the failure this surface exists to avoid (SPEC 4.1).
     const client = await connect(serving(fixture("search-page-1")));
     const result = await search(client, { keywords: "fahrrad" });
-    expect(result.total).toBe(39183);
+    expect(result.total).toBe(38995);
     expect(result.reachable).toBe(1250);
     expect(result.range).toEqual({ from: 1, to: 25 });
   });
@@ -222,8 +235,7 @@ describe("the operational failures", () => {
   });
 
   it("surfaces the degenerate signature as isError", async () => {
-    const doctored = fixture("search-page-1").replace(/1 - 25 von 39\.183[^<]*/u, "1 - 1 von 1");
-    const client = await connect(serving(doctored));
+    const client = await connect(serving(withSummary("search-page-1", "1 - 1 von 1")));
     const result = await client.callTool({
       name: "search_listings",
       arguments: { category_id: 217 },
@@ -254,8 +266,8 @@ describe("the server-side filter surface", () => {
     // Parameter order is the cache key's, not the builder's: the fetch core
     // normalises before it asks, so two spellings of one query are one entry.
     expect(requested).toEqual([
-      "https://www.kleinanzeigen.de/s-seite:3/c217l3331" +
-        "?adType=OFFER&buyNowEnabled=true&keywords=hollandrad&maxPrice=900&minPrice=10" +
+      "https://www.kleinanzeigen.de/s-suche/c217l3331" +
+        "?adType=OFFER&buyNowEnabled=true&keywords=hollandrad&maxPrice=900&minPrice=10&pageNum=3" +
         "&posterType=PRIVATE&radius=50&shipping=true&shippingCarrier=DHL&sortingField=PRICE_AMOUNT",
     ]);
   });
@@ -269,7 +281,7 @@ describe("the server-side filter surface", () => {
     const result = await search(client, { poster_type: "COMMERCIAL", shipping_carrier: "DHL" });
     expect(result).toMatchObject({ listings: [], total: 0, range: null });
     expect(requested).toEqual([
-      "https://www.kleinanzeigen.de/s-k0?posterType=COMMERCIAL&shippingCarrier=DHL",
+      "https://www.kleinanzeigen.de/s-suche/k0?keywords=&posterType=COMMERCIAL&shippingCarrier=DHL",
     ]);
   });
 
@@ -289,7 +301,7 @@ describe("the server-side filter surface", () => {
 
 describe("what the result deliberately does not carry", () => {
   it("never returns the applied scope, which is a live label bug", async () => {
-    // `span.breadcrump-summary`'s trailing noun phrase names a different
+    // `#srp-breadcrumb-summary`'s trailing noun phrase names a different
     // category on `/s-sammeln/c234`, and echoing the site's own account of what
     // it did is worse than returning nothing. `location_resolution` is the
     // guard instead (SPEC 5.5, 11.1).

@@ -254,8 +254,8 @@ export function parseListingPage(body: string, options: ParseOptions): ListingRe
     // **Exactly what the page gave**, large gallery URLs and all, with no
     // size-grammar rewriting (SPEC 3.3).
     images,
-    // **Derived, and it has to be**: a search row states its count in
-    // `.galleryimage--counter`, and the only counters on a detail page belong
+    // **Derived, and it has to be**: a search row states its count in its own
+    // image container's counter, and the only counters on a detail page belong
     // to the *other* listings at the foot of it. The gallery is the count.
     image_count: images.length,
     listing_type: soldLabel === "Gefunden" ? "WANTED" : "OFFER",

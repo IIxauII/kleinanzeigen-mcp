@@ -5,3 +5,6 @@ build/
 *.log
 .fixture-capture/
 .claude/
+
+# Local code-review receipts, never pushed
+.review-receipts/

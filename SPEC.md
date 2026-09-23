@@ -61,12 +61,18 @@ Everything the server ever fetches. Nothing else may be added without re-running
 
 | Inputs | Path |
 | --- | --- |
-| none | `/s-[seite:N/]k0` |
-| category | `/s-[seite:N/]c<id>` |
-| location | `/s-[seite:N/]l<id>` |
-| category + location | `/s-[seite:N/]c<id>l<id>` |
+| none | `/s-suche/k0` |
+| category | `/s-suche/c<id>` |
+| location | `/s-suche/l<id>` |
+| category + location | `/s-suche/c<id>l<id>` |
 
-`k0` is a **literal token** (`k1`/`k9` → 404). Leading slugs are cosmetic and are never emitted. **The keyword is never a path segment** — see §11.2.
+`k0` is a **literal token** (`k1`/`k9` → 404). **The keyword is never a path segment** — see §11.2.
+
+> **Correction, recorded while fixing the redesign regression ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).** This section used to read *"leading slugs are cosmetic and are never emitted"*, and used to spell a page as the path segment `seite:N`. Both stopped being true, and the shipped `1.0.0` returned `HTTP 404` for every keyword search as a result.
+>
+> - **A slugless path code now 404s** unless it carries a location id: `/s-k0?keywords=Rennrad` and `/s-c217` are 404, while `/s-l945` and `/s-c217l945` still answer 200. So every search URL carries a **constant cosmetic slug, `s-suche`**. Its *spelling* still carries nothing — `/s-suche/c217` and `/s-irgendwas/c217` answer identically — which is why one constant is emitted rather than a slugified keyword. It is not part of the path code.
+> - **An unpaired slug is read as the keyword.** Because the slug now always occupies the first segment, `?keywords=` has to be sent on **every** request, empty string included; omitting it makes the site search for `suche`.
+> - **A page is now `?pageNum=N`.** The path-segment spelling still works, but the query-string spelling is both the site's own and the one `robots.txt` has nothing to say about — see §2.3 and ADR-0001.
 
 Query parameters, all verified live on allowed pretty URLs:
 
@@ -82,6 +88,7 @@ Query parameters, all verified live on allowed pretty URLs:
 ?shippingCarrier=DHL | HERMES
 ?buyNowEnabled=  true
 ?sortingField=   SORTING_DATE | PRICE_AMOUNT | PRICE_AMOUNT_DESC
+?pageNum=        the 1-based page; page 1 is the default and is never spelled
 ```
 
 **Listing detail** (HTML, `GET`) — `/s-anzeige/x/<ad_id>`. Only the ad id is load-bearing; the slug and the trailing `-<category_id>-<location_id>` are cosmetic.
@@ -94,7 +101,7 @@ Query parameters, all verified live on allowed pretty URLs:
 
 **Build-time only, never at runtime** — `/sitemap_index.xml`, `/sitemap_categories.xml`, `/sitemap_cities.xml`.
 
-The three `_actions` and slugless `seite:` forms are the four places the literal rule is actually load-bearing; `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` and `/pro/` appear **nowhere** in the file's 252 `*` rules ([#14](https://github.com/IIxauII/kleinanzeigen-mcp/issues/14)).
+The three `_actions` forms are where the literal rule is actually load-bearing — the slugless `seite:` form it also used to cover is no longer emitted (§2.3); `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` and `/pro/` appear **nowhere** in the file's 252 `*` rules ([#14](https://github.com/IIxauII/kleinanzeigen-mcp/issues/14)).
 
 ### 2.3 Refused URL forms
 
@@ -102,13 +109,13 @@ The three `_actions` and slugless `seite:` forms are the four places the literal
 
 The filters themselves are **not** refused — only these spellings of them. `robots.txt` fences the path-segment form; the query-string form matches no line, and the file's authors used query-string exclusions three times elsewhere (`utm_source`, `simcid`, `view=karte`), so the mechanism was available and was not applied here ([#4](https://github.com/IIxauII/kleinanzeigen-mcp/issues/4)).
 
-Two escapes are **noticed and deliberately not taken**, because the tool would have to construct them on purpose and both sit under a wall of hand-written rules: `/s-l<id>r<km>` (the slugless radius form — moot anyway, `?radius=` covers radius entirely), and any radius path form. Slugless pagination *is* taken; [ADR-0001](./docs/adr/0001-robots-clean-html-read-literally.md) explains why that is not the same act.
+Two escapes are **noticed and deliberately not taken**, because the tool would have to construct them on purpose and both sit under a wall of hand-written rules: `/s-l<id>r<km>` (the slugless radius form — moot anyway, `?radius=` covers radius entirely), and any radius path form. Slugless `seite:N` pagination *was* taken, and [ADR-0001](./docs/adr/0001-robots-clean-html-read-literally.md) explains why that was not the same act. **Since [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) it is not emitted at all**: the redesign moved paging to `?pageNum=`, which matches no rule for exactly the reason the query-string filters above match none. ADR-0001's reasoning still stands as the record of why the path form would have been defensible; the grammar simply no longer needs it, so the most contentious of its three unmatched paths is now unexercised.
 
 ### 2.4 The result ceiling and the page-50 clamp
 
 - **25 organic listings per page × 50 pages = 1 250 organic listings per query.** Measured, not assumed.
 - **TOP listings are extra**, up to 2 per page, consuming no result slot — so a page reporting `51 - 75` can carry 27 rows. They are not constant: 2/page on broad queries, **0/page** on narrow ones.
-- **Page 50 is the last honest page, and the clamp is silent.** Page 51+ re-serve page 50 at HTTP 200 with a full 27 plausible rows and no error; deeper still (page 1000) the range resets to page 1's.
+- **Page 50 is the last honest page, and the clamp is silent.** Page 51+ answer with page 50's full 27 plausible rows and no error; deeper still (page 1000) the range resets to page 1's.
 
 | page | reported range | expected start |
 | --- | --- | --- |
@@ -118,13 +125,17 @@ Two escapes are **noticed and deliberately not taken**, because the tool would h
 | 100 | `1.226 - 1.250` | 2476 ❌ |
 | 1000 | `1 - 25` | 24976 ❌ |
 
-**Detection rule.** Page N's honest range starts at `(N − 1) × 25 + 1`. Read the `N - M von T` range off `span.breadcrump-summary`; if the reported start ≠ the expected start, the page was clamped. This is **stateless** — no previous page, no query-scoped state — which is what lets it coexist with ADR-0002.
+**Detection rule.** Page N's honest range starts at `(N − 1) × 25 + 1`. Read the `N - M von T` range off `#srp-breadcrumb-summary`; if the reported start ≠ the expected start, the page was clamped. This is **stateless** — no previous page, no query-scoped state — which is what lets it coexist with ADR-0002.
 
 **Never infer depth from row counts.** A clamped page is full.
 
+> **Correction, recorded while fixing the redesign regression ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).** The **ranges above are unchanged** and the detection rule is untouched — but the clamp is now served as a **302 rather than a silent 200 re-serve**. `?pageNum=51` and `?pageNum=100` redirect to `/s-seite:50/<keyword>/k0`, and `?pageNum=1000` to `/s-<keyword>/k0`; the fetch core follows redirects (§5.3 already relies on that), so the parser still reads page 50's `1.226 - 1.250` and page 1's `1 - 25` respectively, and still detects the clamp against the page that was *asked for*. Verified live.
+>
+> Two consequences worth stating. The clamp is still **silent** in the sense that matters — no error, a full page of plausible rows — so nothing downstream changes. And the redirect lands on a `seite:50` *path* form, which §2.3 and ADR-0001 are careful about: that form is **followed, never constructed**, and it matches no `robots.txt` rule either way (the 54 hand-written `seite:` rules all require a literal `/seite:N`, which `/s-seite:50/…` does not contain).
+
 ### 2.5 Paging is lazy, caller-driven, and never fanned out
 
-Pages are independently addressable: `/s-seite:N/…` needs no cursor, session or cookie, and page 1000 was fetched cold from nothing. Page N costs exactly one request, never a replay of 1…N−1.
+Pages are independently addressable: `?pageNum=N` needs no cursor, session or cookie, and page 1000 was fetched cold from nothing. Page N costs exactly one request, never a replay of 1…N−1.
 
 So: **one `search_listings` call fetches exactly one page.** No fixed cap, no internal walk, no opaque cursor. A cursor would be a fiction maintained over a source that has none, and `nextCursor: null` can tell the caller it stopped but never that it was *clamped*. An internal `limit: 1000` walk is 40 requests and ~60 s of wall clock hidden behind one call — and ADR-0003's "the operator owns their IP and their risk" only works if the request count is predictable from the call.
 
@@ -230,10 +241,10 @@ type SearchRow = {
 
 > **Correction, recorded while building `search_listings` ([#19](https://github.com/IIxauII/kleinanzeigen-mcp/issues/19)).** Two of `SearchRow`'s fields above are not always present on the live page, and both are now **nullable**.
 >
-> - **`posted` is `null` on a TOP row.** A promoted row renders an empty `.aditem-main--top--right` — no date, no calendar icon — on every page sampled, while every organic row on those same pages carries one. Since TOP listings are returned flagged and in place (§4.1), the date has to be allowed to be missing on exactly the rows that are marked as the reason it is.
-> - **`description` falls back to the visible snippet** on a picture-less row. The ~200-character text lives in the row's `ld+json`, and that block describes the row's *image*: a row rendering `imagebox is-nopic` has no `ld+json` at all (17 of 108 sampled rows). The visible `p.aditem-main--middle--description` is shorter, and reading it is honest; treating the absence as a parse failure would make a normal row look like a DOM change.
+> - **`posted` is `null` on a TOP row.** A promoted row renders no date element beside the location at all — since the redesign, not even an empty one — on every page sampled, while every organic row on those same pages carries one. Since TOP listings are returned flagged and in place (§4.1), the date has to be allowed to be missing on exactly the rows that are marked as the reason it is.
+> - **`description` falls back to the visible snippet** on a picture-less row. The ~200-character text lives in the row's `ld+json`, and that block describes the row's *image*: a row rendering `imagebox is-nopic` has no `ld+json` at all (17 of 108 sampled rows). The visible snippet — the `<p>` immediately after the row's `<h3>` — is shorter, and reading it is honest; treating the absence as a parse failure would make a normal row look like a DOM change.
 >
-> `thumbnail: null` and `image_count: 0` on those same rows were already in the type. A row that renders an image but no `.galleryimage--counter` has exactly one image.
+> `thumbnail: null` and `image_count: 0` on those same rows were already in the type. A row that renders an image but no image counter has exactly one image.
 
 ```ts
 type Listing = {
@@ -264,7 +275,7 @@ type Listing = {
 > **Correction, recorded while building `get_listing` ([#21](https://github.com/IIxauII/kleinanzeigen-mcp/issues/21)).** Three readings of `Listing` did not survive contact with the live detail page.
 >
 > - **`old_price` is not on this surface, and is not on the shape `get_listing` returns.** The detail page renders no struck-through price at all — the price drop is markup on a *search row*, and the only struck-through prices on a detail page belong to the seller's other listings and the related-ads block at its foot, both of which are results-page markup for listings nobody asked for. Carrying it as an optional field that can never be populated would promise a reading the page does not have, so `get_listing`'s schema omits it; `SearchRow`'s keeps it.
-> - **`image_count` is derived from the gallery here, and has to be.** A search row states its count in `.galleryimage--counter`; the only elements of that class on a detail page belong to the *other* listings at the foot of it. There is no second source to hold the gallery against.
+> - **`image_count` is derived from the gallery here, and has to be.** A search row states its count in its own image container's counter; the only such counters on a detail page belong to the *other* listings at the foot of it. There is no second source to hold the gallery against.
 > - **The posting date is picked out of `#viewad-extra-info`, not read as the whole of it.** The view counter shares that element and is filled in by script after load, so the date is the `DD.MM.YYYY` token inside it (SPEC 5.5's rule: read numbers off the markup).
 > - **Boolean feature tags are not attributes and are not returned.** `.checktaglist .checktag` carries label-only booleans — `Anhängerkupplung`, `Balkon` — with no value beside them. `attributes` is a label/value list, and returning `{ label: "Balkon", value: "" }` would invent a shape the page does not have. Their absence is a known gap, not an oversight.
 
@@ -635,14 +646,28 @@ These have appeared identically across five languages of scraper spanning 2021�
 | Anchor | Reads |
 | --- | --- |
 | `#srchrslt-adtable` | the results container |
-| `li.ad-listitem` | a row slot — **5–8 per page carry no `data-adid` and are ad banners; drop them silently** |
-| `article.aditem[data-adid]` | a listing row; `data-adid` is the ad id |
-| `li.is-topad` | a TOP listing → `promoted: true` |
-| `li.is-highlight` | a highlighted listing — no effect on ranking, not surfaced |
-| `span.breadcrump-summary` | `N - M von T` — **numbers only**, see §5.5 |
-| `span.simpletag` | `Gesuch` → `listing_type: "WANTED"`; `Versand möglich` → `shipping: true`; `Direkt kaufen` |
+| its direct `li` children | a row slot — **~5 per page carry no `data-adid` and are ad banners; drop them silently** |
+| `article[data-adid]` | a listing row; `data-adid` is the ad id |
+| a slot's direct child `<svg>` | the corner ribbon marking a TOP listing → `promoted: true` |
+| `#srp-breadcrumb-summary` | `N - M von T` — **numbers only**, see §5.5 |
+| `h3 a`, `h3 span[data-url]` | the row title, linked and unlinked — see §5.1's note below |
+| the `<p>` right after the `<h3>` | the visible description snippet |
+| `p.text-title3.font-strong` | the current price |
+| `p.line-through` | the previous price, where a drop is rendered |
+| `svg[data-title='locationOutline']`'s parent `<div>` | postcode, location name and the distance an active radius adds |
+| that `<div>`'s next sibling | the posting date — **absent entirely on a TOP row** |
+| `[data-image-container] img` | the thumbnail |
+| `[data-image-container] div.absolute.bottom-xsmall` | the image counter; no counter means exactly one image |
+| `[data-dhl-promotion]` | `Gesuch` → `listing_type: "WANTED"`; `Versand möglich` → `shipping: true`; `Direkt kaufen` |
 | the row's `ld+json` | the ~200-char description, longer than the visible snippet |
-| `a.pagination-page` | present, but never used for navigation — pages are addressed directly |
+
+> **Correction, recorded while fixing the redesign regression ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).** The opening claim above — *"it is the anti-bot layer that churns, not the DOM"* — did not hold. The results page was rewritten from semantic class names to headings, utility classes and data attributes, and **every** search anchor in the table moved; the table above is the post-redesign set. `#srchrslt-adtable` and `article[data-adid]` are the two that survived, and the listing-detail and shop anchors below were untouched.
+>
+> The shape of the change is worth recording, because it says what to expect next time: the semantic, hand-written class names (`aditem-main--middle--price-shipping--price`, `galleryimage--counter`, `simpletag`, `ad-listitem`, `is-topad`) were replaced either by **utility classes** that describe rendering rather than meaning, or by **data attributes** and **icon `data-title`s**. Utility classes are the weaker anchor of the two — `p.text-title3.font-strong` names a type scale, and a redesign that restyles the price breaks it — so where the markup offered both, the data attribute was taken. `svg[data-title='locationOutline']` is deliberately an icon identity rather than a position: the location and date `<div>`s are otherwise indistinguishable siblings.
+>
+> Two anchors were dropped rather than migrated, because the elements no longer exist: `li.is-highlight` (a highlighted listing, never surfaced) and `a.pagination-page` (present but never used for navigation — pages are addressed directly, §2.5). Neither occurs in the recaptured fixtures.
+>
+> Because one unreadable row fails the whole page (§5.8), none of these could be migrated in isolation.
 
 **Listing detail page**
 
@@ -714,9 +739,9 @@ The site renders correct numbers under wrong labels in at least three places. **
 
 > **Read numbers off the markup. Never read an applied scope, an applied filter or an applied sort off it.**
 
-1. **`rel="canonical"` lies about location scope.** `/s-mitte/10115/…` scopes correctly to `10115 Mitte` but canonicalises to all of Berlin. Read counts off `span.breadcrump-summary`, never off canonical.
-2. **`span.breadcrump-summary`'s own trailing noun phrase lies about category.** `/s-sammeln/c234` renders `1 - 25 von 2.293.257 Comics in Deutschland` while the breadcrumb leaf and canonical both say `Sammeln` — and `Comics` is `c284`, a different category. The **numbers** in that span are authoritative; the trailing phrase is not, and is never parsed.
-3. **Facet pre-counts lie.** The *unfiltered* `Direkt kaufen → Aktiv` pre-count is byte-identical to the `Angebote` count — a threefold overstatement — while the carrier facets beside it are right to the digit. **Never read a total off a facet count.** Every `total` comes from `span.breadcrump-summary` of the *filtered* request.
+1. **`rel="canonical"` lies about location scope.** `/s-mitte/10115/…` scopes correctly to `10115 Mitte` but canonicalises to all of Berlin. Read counts off `#srp-breadcrumb-summary`, never off canonical.
+2. **`#srp-breadcrumb-summary`'s own trailing noun phrase lies about category.** `/s-sammeln/c234` renders `1 - 25 von 2.293.257 Comics in Deutschland` while the breadcrumb leaf and canonical both say `Sammeln` — and `Comics` is `c284`, a different category. The **numbers** in that span are authoritative; the trailing phrase is not, and is never parsed.
+3. **Facet pre-counts lie.** The *unfiltered* `Direkt kaufen → Aktiv` pre-count is byte-identical to the `Angebote` count — a threefold overstatement — while the carrier facets beside it are right to the digit. **Never read a total off a facet count.** Every `total` comes from `#srp-breadcrumb-summary` of the *filtered* request.
 
 **Applied-filter chips are not a parse-time assertion either.** On `c173` the `shipping=false` page renders no chip though the filter is plainly applied: two shipping-facet spellings coexist (the global `versand:ja|nein` path segment and the category attribute `<slug>.versand_s:ja|nein`), and where the sidebar uses the attribute spelling, an applied *global* filter matches no facet item and emits no chip. Nothing in this spec reads chips; this is a reason to keep it that way.
 
@@ -731,9 +756,9 @@ Bad parameter combinations return HTTP 200 with `Es wurden keine Ergebnisse gefu
 
 ### 5.7 The degenerate-form guard
 
-One search URL shape is known to return garbage: `/s-seite:N/k0c<id>` — slugless *and* keywordless with a combined category code — returns `1 - 1 von 1`. §2.2's grammar never emits it (keywordless queries drop `k0`, and keywords always ride the query string), so it is structurally unreachable.
+One search URL shape is known to return garbage: a **keywordless combined code**, `k0c<id>`, returns `1 - 1 von 1`. §2.2's grammar never emits it (keywordless queries drop `k0`, and keywords always ride the query string), so it is structurally unreachable. The shape was first observed on the slugless paged form `/s-seite:N/k0c<id>`; the slug and the paging spelling were never what made it degenerate, and the guard below is written against the code rather than the path.
 
-Two grammar shapes were not fetched during the map: paged `/s-seite:N/l<id>`, and `/s-[seite:N/]c<id>l<id>`. Both follow the verified grammar, and this guard covers them:
+Two grammar shapes were not fetched during the map: paged `l<id>`, and `c<id>l<id>`. Both follow the verified grammar, and this guard covers them:
 
 > A **keywordless** query whose only narrowing inputs are `category_id` and/or `location_id` — no keywords, no price bounds, no other filter — that reports `1 - 1 von 1` is the degenerate signature, not data. Treat it as a parse-level assertion failure (`isError`), never as a result.
 
@@ -1147,7 +1172,7 @@ Four decisions from different tickets disagreed, and one convention was never fi
 
 ### 11.1 `scope` is dropped from the search envelope
 
-**[#10](https://github.com/IIxauII/kleinanzeigen-mcp/issues/10) specified `scope: "in 10115 Mitte und Umgebung"`, echoed from `span.breadcrump-summary`**, as the cheapest guard against a silently-wrong location — a request that came from [#6](https://github.com/IIxauII/kleinanzeigen-mcp/issues/6).
+**[#10](https://github.com/IIxauII/kleinanzeigen-mcp/issues/10) specified `scope: "in 10115 Mitte und Umgebung"`, echoed from `#srp-breadcrumb-summary`**, as the cheapest guard against a silently-wrong location — a request that came from [#6](https://github.com/IIxauII/kleinanzeigen-mcp/issues/6).
 
 **[#15](https://github.com/IIxauII/kleinanzeigen-mcp/issues/15) then found that span's trailing noun phrase is a live label bug** (§5.5 case 2). The map's standing constraint was updated to *"read only the numbers out of that span… the applied scope is never parsed from markup"*, which post-dates and overrides #10.
 
@@ -1160,7 +1185,7 @@ Never settled explicitly. [#4](https://github.com/IIxauII/kleinanzeigen-mcp/issu
 **Settled: `?keywords=` always; the keyword is never a path segment.** Three things fall out, all good:
 
 - **No slugification anywhere in the spec** — no umlaut transliteration, no space encoding, no decision about what a keyword slug even is. This is the same discipline §4.5 applies to `find_shop`: pass the caller's string through.
-- **The degenerate `/s-seite:N/k0c<id>` form becomes structurally unreachable**, because a keywordless query drops `k0` and emits the verified bare-code form.
+- **The degenerate `k0c<id>` form becomes structurally unreachable**, because a keywordless query drops `k0` and emits the verified bare-code form.
 - The path grammar collapses to four shapes driven only by `category_id` and `location_id`.
 
 ### 11.3 The rate-limit env variable is `KLEINANZEIGEN_MCP_RATE_LIMIT_MS`
