@@ -1,3 +1,11 @@
+## [1.0.1](https://github.com/IIxauII/kleinanzeigen-mcp/compare/v1.0.0...v1.0.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* re-anchor search_listings to the redesigned site ([#82](https://github.com/IIxauII/kleinanzeigen-mcp/issues/82)) ([178385f](https://github.com/IIxauII/kleinanzeigen-mcp/commit/178385f23b329b2901e4045a179f06ea9d55559b)), closes [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)
+* rebuild the category tree for the redesign's two new nodes ([#83](https://github.com/IIxauII/kleinanzeigen-mcp/issues/83)) ([ef96c30](https://github.com/IIxauII/kleinanzeigen-mcp/commit/ef96c302a460b13d20eb96fee00557449dcbd9dc))
+
 # 1.0.0 (2026-09-09)
 
 
