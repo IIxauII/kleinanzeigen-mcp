@@ -71,8 +71,13 @@ export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
 /**
  * The path code, which is driven only by `category_id` and `location_id` —
- * **`k0` is a literal token**, `k1`/`k9` 404, and leading slugs are cosmetic
- * and never emitted (SPEC 2.2).
+ * **`k0` is a literal token** and leading slugs are cosmetic (SPEC 2.2).
+ *
+ * Since the redesign the slug is no longer omittable: a bare `/s-k0` 404s, so
+ * every URL carries the constant cosmetic slug `s-suche`. It stays out of
+ * `pathCode` because it is not part of the code — and because a slug the site
+ * cannot pair with a `?keywords=` parameter is read as a keyword, which is
+ * why `searchUrl` sets that parameter always, empty string included.
  */
 function pathCode({ category_id, location_id }: SearchQuery): string {
   if (category_id !== undefined && location_id !== undefined) return `c${category_id}l${location_id}`;
@@ -81,26 +86,35 @@ function pathCode({ category_id, location_id }: SearchQuery): string {
   return "k0";
 }
 
+/** The constant cosmetic slug every search URL carries — see `pathCode`. */
+const SLUG = "s-suche";
+
 /**
  * The URL for one page of a search query.
  *
  * **The keyword never becomes a path segment** — it always rides `?keywords=`,
  * so nothing here slugifies, transliterates an umlaut, or decides how a space
- * is spelled in a path (SPEC 11.2). Slugless `seite:N` addresses a page
- * directly, which is what makes page N cost exactly one request (SPEC 2.5).
+ * is spelled in a path (SPEC 11.2). The parameter is set **always**, empty
+ * string included: without it the site reads the path slug as the keyword.
+ * `?pageNum=` addresses a page directly, which is what makes page N cost
+ * exactly one request (SPEC 2.5).
+ *
+ * `/s-suchanfrage.html` — the site's own search form's target, which
+ * 302-canonicalises every query into slugged path-segment forms — is
+ * `Disallow`'d, as are the filter spellings it canonicalises to, so it is
+ * never emitted (SPEC 2.3).
  *
  * Every wire parameter name is the site's, and this is the one place the
  * mapping from `snake_case` arguments lives (SPEC 11.5).
  */
 export function searchUrl(query: SearchQuery): string {
-  const page = query.page ?? 1;
-  const seite = page > 1 ? `seite:${page}/` : "";
-  const url = new URL(`/s-${seite}${pathCode(query)}`, ORIGIN);
+  const url = new URL(`/${SLUG}/${pathCode(query)}`, ORIGIN);
 
   const set = (key: string, value: string | number | boolean): void => {
     url.searchParams.set(key, String(value));
   };
-  if (query.keywords !== undefined) set("keywords", query.keywords);
+  // Always set — see the doc comment above.
+  set("keywords", query.keywords ?? "");
   if (query.location !== undefined) set("locationStr", query.location);
   if (query.radius !== undefined) set("radius", query.radius);
   if (query.min_price !== undefined) set("minPrice", query.min_price);
@@ -120,6 +134,9 @@ export function searchUrl(query: SearchQuery): string {
   // Sent only when the caller asks for one; the applied sort cannot be read
   // back, so the envelope reports what was sent (SPEC 4.1).
   if (query.sort !== undefined) set("sortingField", query.sort);
+  // Page 1 is the default and is never spelled out.
+  const page = query.page ?? 1;
+  if (page > 1) set("pageNum", page);
 
   return url.toString();
 }

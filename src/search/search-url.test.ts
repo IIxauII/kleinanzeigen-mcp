@@ -16,28 +16,36 @@ describe("the search URL grammar", () => {
     // No slugification anywhere: no umlaut transliteration, no space-encoding
     // decision about a path (SPEC 11.2).
     const url = searchUrl({ keywords: "Damenrad für Kinder" });
-    expect(path(url)).toBe("/s-k0");
+    expect(path(url)).toBe("/s-suche/k0");
     expect(query(url).get("keywords")).toBe("Damenrad für Kinder");
     expect(url).not.toContain("damenrad-fuer");
   });
 
-  it("emits the keywordless token as a literal and never a leading slug", () => {
-    expect(path(searchUrl({}))).toBe("/s-k0");
-    expect(path(searchUrl({ category_id: 217 }))).toBe("/s-c217");
-    expect(path(searchUrl({ location_id: 3331 }))).toBe("/s-l3331");
-    expect(path(searchUrl({ category_id: 217, location_id: 3331 }))).toBe("/s-c217l3331");
+  it("sets keywords always, because an unset one makes the slug the keyword", () => {
+    // A bare `/s-k0` 404s since the redesign, so every URL carries the
+    // constant cosmetic slug — which the site reads as a keyword unless
+    // `?keywords=` says otherwise, empty string included (SPEC 2.2).
+    expect(query(searchUrl({})).get("keywords")).toBe("");
+    expect(query(searchUrl({ category_id: 217 })).get("keywords")).toBe("");
   });
 
-  it("addresses a page directly, sluglessly", () => {
+  it("emits the keywordless token behind the constant cosmetic slug", () => {
+    expect(path(searchUrl({}))).toBe("/s-suche/k0");
+    expect(path(searchUrl({ category_id: 217 }))).toBe("/s-suche/c217");
+    expect(path(searchUrl({ location_id: 3331 }))).toBe("/s-suche/l3331");
+    expect(path(searchUrl({ category_id: 217, location_id: 3331 }))).toBe("/s-suche/c217l3331");
+  });
+
+  it("addresses a page directly, by query parameter", () => {
     // Page N costs exactly one request and never replays 1…N−1 (SPEC 2.5).
-    expect(path(searchUrl({ page: 1, keywords: "fahrrad" }))).toBe("/s-k0");
-    expect(path(searchUrl({ page: 7, keywords: "fahrrad" }))).toBe("/s-seite:7/k0");
-    expect(path(searchUrl({ page: 50, category_id: 217 }))).toBe("/s-seite:50/c217");
+    expect(query(searchUrl({ page: 1, keywords: "fahrrad" })).has("pageNum")).toBe(false);
+    expect(query(searchUrl({ page: 7, keywords: "fahrrad" })).get("pageNum")).toBe("7");
+    expect(query(searchUrl({ page: 50, category_id: 217 })).get("pageNum")).toBe("50");
   });
 
-  it("never emits the degenerate slugless keywordless combined form", () => {
-    // `/s-seite:N/k0c<id>` returns `1 - 1 von 1`. The grammar cannot reach it,
-    // because a category drops `k0` entirely (SPEC 5.7).
+  it("never emits the degenerate keywordless combined form", () => {
+    // `k0c<id>` with no keywords is the garbage form §5.7 guards against. The
+    // grammar cannot reach it, because a category drops `k0` entirely.
     expect(path(searchUrl({ page: 3, category_id: 217 }))).not.toContain("k0");
   });
 
@@ -113,6 +121,7 @@ describe("the filters the site answers server-side", () => {
     // `?shippingCarrier=DHL` and `?shipping=true&shippingCarrier=DHL` return the
     // identical total, so nothing is added on the caller's behalf (SPEC 4.1).
     expect(Object.fromEntries(query(searchUrl({ shipping_carrier: "HERMES" })))).toEqual({
+      keywords: "",
       shippingCarrier: "HERMES",
     });
   });
@@ -124,12 +133,12 @@ describe("the filters the site answers server-side", () => {
     // "fixed" by dropping a parameter, which would answer a different question.
     expect(
       Object.fromEntries(query(searchUrl({ poster_type: "COMMERCIAL", shipping_carrier: "DHL" }))),
-    ).toEqual({ posterType: "COMMERCIAL", shippingCarrier: "DHL" });
+    ).toEqual({ keywords: "", posterType: "COMMERCIAL", shippingCarrier: "DHL" });
     expect(Object.fromEntries(query(searchUrl({ poster_type: "COMMERCIAL", buy_now: true })))).toEqual(
-      { posterType: "COMMERCIAL", buyNowEnabled: "true" },
+      { keywords: "", posterType: "COMMERCIAL", buyNowEnabled: "true" },
     );
     expect(Object.fromEntries(query(searchUrl({ shipping: false, shipping_carrier: "HERMES" })))) //
-      .toEqual({ shipping: "false", shippingCarrier: "HERMES" });
+      .toEqual({ keywords: "", shipping: "false", shippingCarrier: "HERMES" });
   });
 
   it("maps every argument to the site's own wire parameter name", () => {
@@ -151,7 +160,7 @@ describe("the filters the site answers server-side", () => {
       sort: "PRICE_AMOUNT",
       page: 3,
     });
-    expect(path(url)).toBe("/s-seite:3/c217l3331");
+    expect(path(url)).toBe("/s-suche/c217l3331");
     expect(Object.fromEntries(query(url))).toEqual({
       keywords: "hollandrad",
       radius: "50",
@@ -163,6 +172,7 @@ describe("the filters the site answers server-side", () => {
       shippingCarrier: "DHL",
       buyNowEnabled: "true",
       sortingField: "PRICE_AMOUNT",
+      pageNum: "3",
     });
     // Free-text location is the one argument the surface above cannot also
     // carry: it is mutually exclusive with `location_id`.

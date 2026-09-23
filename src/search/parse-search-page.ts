@@ -72,8 +72,9 @@ function parseWhere(rendered: string): {
  * than the visible snippet (SPEC 5.1).
  *
  * A **picture-less** row has no `ld+json` at all — the block describes the
- * image — so there the visible snippet is the reading rather than a parse
- * failure. Losing *both* is a DOM change, and shouts (SPEC 5.8).
+ * image — so there the visible snippet (the `<p>` right after the heading) is
+ * the reading rather than a parse failure. Losing *both* is a DOM change, and
+ * shouts (SPEC 5.8).
  */
 function description(article: Selection, ad_id: string): string {
   const block = article.find("script[type='application/ld+json']").first();
@@ -85,7 +86,7 @@ function description(article: Selection, ad_id: string): string {
       throw new ParseError(`row ${ad_id}'s ld+json is not JSON`);
     }
   }
-  const snippet = text(article.find("p.aditem-main--middle--description").first());
+  const snippet = text(article.find("h3").first().next("p"));
   if (snippet === "") throw new ParseError(`row ${ad_id} has no description on either surface`);
   return snippet;
 }
@@ -104,9 +105,9 @@ function posting(rendered: string, promoted: boolean, ad_id: string, now?: Date)
 
 /**
  * The row's title, off **either** heading the site renders: the linked
- * `<h2><a>`, and the unlinked `<h2><span class="ellipsis ref-not-linked">` it
- * uses for a sizeable minority of rows — 13 of 27 on `?keywords=ps5` — which
- * carries its target in `data-url` rather than an `href`.
+ * `<h3><a>`, and the unlinked `<h3><span data-url="…">` it uses for a
+ * minority of rows — 3 of `search-unlinked-title`'s 27 — which carries its
+ * target in `data-url` rather than an `href`.
  *
  * The unlinked form costs the parser nothing else: the row's own `data-href`
  * is what the URL is read from either way. Reading only the anchor turned this
@@ -116,7 +117,7 @@ function posting(rendered: string, promoted: boolean, ad_id: string, now?: Date)
  * A row carrying neither heading did lose it to a DOM change, and shouts.
  */
 function heading(article: Selection, ad_id: string): string {
-  const title = text(article.find("h2 a, h2 span.ellipsis").first());
+  const title = text(article.find("h3 a, h3 span[data-url]").first());
   if (title === "") throw new ParseError(`row ${ad_id} has no title`);
   return title;
 }
@@ -128,13 +129,22 @@ function parseRow($: cheerio.CheerioAPI, article: Selection, promoted: boolean, 
 
   const title = heading(article, ad_id);
 
-  const priced = article.find("p.aditem-main--middle--price-shipping--price").first();
-  const wasPriced = article.find("p.aditem-main--middle--price-shipping--old-price").first();
-  const posted = text(article.find(".aditem-main--top--right").first());
-  const image = article.find(".aditem-image img").first();
-  const counter = text(article.find(".galleryimage--counter").first());
+  // The current price is the strong `<p>`; a price drop is its struck-through
+  // sibling, and appears only where the site renders one (SPEC 3.1).
+  const priced = article.find("p.text-title3.font-strong").first();
+  const wasPriced = article.find("p.line-through").first();
+  // Location and posting date share the row's top line: the location `<div>`
+  // (marked by its own `locationOutline` icon) carries postcode, name and,
+  // under an active radius, the distance; the `<div>` next to it carries the
+  // date. A TOP row renders no date `<div>` at all (SPEC 3.3's correction).
+  const where = article.find("svg[data-title='locationOutline']").first().parent();
+  const posted = text(where.next());
+  const image = article.find("[data-image-container] img").first();
+  const counter = text(article.find("[data-image-container] div.absolute.bottom-xsmall").first());
+  // `Versand möglich`, `Gesuch` and `Direkt kaufen` ride the same badge
+  // element, the old `span.simpletag`'s successor.
   const tags = article
-    .find("span.simpletag")
+    .find("[data-dhl-promotion]")
     .toArray()
     .map((tag) => text($(tag)));
 
@@ -144,11 +154,10 @@ function parseRow($: cheerio.CheerioAPI, article: Selection, promoted: boolean, 
     title,
     description: description(article, ad_id),
     price: parsePrice(priced.text()),
-    // A price drop appears only where the site renders one (SPEC 3.1).
     ...(wasPriced.length > 0 ? { old_price: parsePrice(wasPriced.text()) } : {}),
     // `postcode`, `location_name` and the distance that renders only under an
     // active radius all come off one line (SPEC 3.3).
-    ...parseWhere(text(article.find(".aditem-main--top--left").first())),
+    ...parseWhere(text(where)),
     posted: posting(posted, promoted, ad_id, now),
     thumbnail: image.attr("src") ?? null,
     // The counter is the total; a row with one image renders none at all, and
@@ -183,8 +192,8 @@ function parseRow($: cheerio.CheerioAPI, article: Selection, promoted: boolean, 
 export function parseSearchPage(body: string, options: ParseOptions): SearchPage {
   const $ = cheerio.load(body);
 
-  const summary = $("span.breadcrump-summary").first();
-  if (summary.length === 0) throw new ParseError("no span.breadcrump-summary on the page");
+  const summary = $("#srp-breadcrumb-summary").first();
+  if (summary.length === 0) throw new ParseError("no #srp-breadcrumb-summary on the page");
   const numbers = SUMMARY.exec(text(summary));
 
   const table = $("#srchrslt-adtable");
@@ -205,16 +214,29 @@ export function parseSearchPage(body: string, options: ParseOptions): SearchPage
       promoted_count: 0,
     };
   }
-  if (numbers === null) throw new ParseError("no `N - M von T` numbers in span.breadcrump-summary");
+  if (numbers === null) throw new ParseError("no `N - M von T` numbers in #srp-breadcrumb-summary");
 
   const listings: SearchRow[] = [];
-  table.find("> li.ad-listitem").each((_, slot) => {
+  table.children("li").each((_, slot) => {
     const li = $(slot);
-    const article = li.find("article.aditem[data-adid]").first();
-    // 5–8 slots per page carry no ad id. They are ad banners, not listings, and
-    // they are dropped **silently** (SPEC 5.1).
+    const article = li.find("article[data-adid]").first();
+    // Several slots per page carry no ad id — 5 to 7 across the recaptured
+    // fixtures that have results. They are ad banners, not listings, and they
+    // are dropped **silently** (SPEC 5.1).
     if (article.length === 0) return;
-    listings.push(parseRow($, article, li.hasClass("is-topad"), options.now));
+    // A TOP row is marked by its corner-ribbon `<svg>`, a direct child of the
+    // slot; an organic row has no direct `<svg>` child. The ribbon carries no
+    // identity of its own — no `data-title`, unlike `locationOutline` — so
+    // this is a structural marker rather than an identifying one, and a second
+    // direct-child `<svg>` (a watchlist heart, say) would read as promoted.
+    //
+    // Deliberately not tightened to the ribbon's dimensions or utility
+    // classes, which are weaker anchors still. The consequence is bounded:
+    // `posting()` parses a date it can see **before** it consults `promoted`,
+    // so a mismarked row still reports its real date. Only a row that is both
+    // mismarked *and* dateless would turn §5.8's loud failure quiet, and a row
+    // losing its date is itself the DOM change that §5.8 exists to catch.
+    listings.push(parseRow($, article, li.children("svg").length > 0, options.now));
   });
 
   const range = { from: germanNumber(numbers[1]!), to: germanNumber(numbers[2]!) };
