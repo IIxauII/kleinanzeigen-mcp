@@ -106,8 +106,8 @@ function posting(rendered: string, promoted: boolean, ad_id: string, now?: Date)
 /**
  * The row's title, off **either** heading the site renders: the linked
  * `<h3><a>`, and the unlinked `<h3><span data-url="…">` it uses for a
- * sizeable minority of rows, which carries its target in `data-url` rather
- * than an `href`.
+ * minority of rows — 3 of `search-unlinked-title`'s 27 — which carries its
+ * target in `data-url` rather than an `href`.
  *
  * The unlinked form costs the parser nothing else: the row's own `data-href`
  * is what the URL is read from either way. Reading only the anchor turned this
@@ -220,8 +220,9 @@ export function parseSearchPage(body: string, options: ParseOptions): SearchPage
   table.children("li").each((_, slot) => {
     const li = $(slot);
     const article = li.find("article[data-adid]").first();
-    // 5 slots per page carry no ad id. They are ad banners, not listings, and
-    // they are dropped **silently** (SPEC 5.1).
+    // Several slots per page carry no ad id — 5 to 7 across the recaptured
+    // fixtures. They are ad banners, not listings, and they are dropped
+    // **silently** (SPEC 5.1).
     if (article.length === 0) return;
     // A TOP row is marked by its corner-ribbon `<svg>`, a direct child of the
     // slot; an organic row has no direct `<svg>` child. The ribbon carries no

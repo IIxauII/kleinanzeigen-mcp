@@ -1,29 +1,13 @@
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
-import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fixture, withSummary } from "../../tests/search-fixture.ts";
 import { BLOCK_MARKER } from "../fetch/breaker.ts";
 import { configureFetchCore, resetFetchCore, type FetchImpl } from "../fetch/core.ts";
 import { loadCityDataset, resetCityDataset } from "../locations/city-dataset.ts";
 import { createServer } from "../server.ts";
 import { SEARCH_LISTINGS_DESCRIPTION, type SearchListingsResult } from "./search-listings.ts";
 
-const fixture = (name: string): string =>
-  readFileSync(new URL(`../../tests/fixtures/${name}.html`, import.meta.url), "utf8");
-
 const dataset = () => loadCityDataset(new URL("../../data/cities.json", import.meta.url));
-
-/**
- * A fixture with the summary the parser reads rewritten, anchored on **the
- * element** rather than on the fixture's own counts — and loud when it
- * rewrites nothing. See the twin in `parse-search-page.test.ts`: a count-
- * anchored replace is what silently disarmed this very test (#81).
- */
-function withSummary(name: string, summary: string): string {
-  const page = fixture(name);
-  const doctored = page.replace(/(id="srp-breadcrumb-summary"[^>]*>)[^<]*/u, `$1${summary}`);
-  if (doctored === page) throw new Error(`${name}: no #srp-breadcrumb-summary to rewrite`);
-  return doctored;
-}
 
 let requested: string[];
 

@@ -1,54 +1,22 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { fixture, rewrite, withSummary } from "../../tests/search-fixture.ts";
 import { ParseError } from "../fetch/errors.ts";
 import { parseSearchPage } from "./parse-search-page.ts";
 import { ORIGIN } from "./search-url.ts";
 
 /**
- * Captured live, minimised to the DOM the parser reads and redacted, by
- * `npm run capture:search-fixtures` (SPEC 8.6). Every count asserted below is
- * the live page's own: 34 slots, 27 of them listings, 2 of those promoted.
+ * The fixtures are captured live and minimised by `npm run
+ * capture:search-fixtures` (SPEC 8.6); `fixture`, `rewrite` and `withSummary`
+ * live in `tests/search-fixture.ts` because the tool tests need the same
+ * doctoring. Every count asserted below is the live page's own: 34 slots, 27 of
+ * them listings, 2 of those promoted.
  */
-const fixture = (name: string): string =>
-  readFileSync(new URL(`../../tests/fixtures/${name}.html`, import.meta.url), "utf8");
 
 /** Fixed so `Heute` and `Gestern` resolve against a known Berlin day. */
 const NOW = new Date("2026-09-23T12:00:00Z");
 
 const parse = (name: string, page = 1, degenerateForm = false) =>
   parseSearchPage(fixture(name), { page, degenerateForm, now: NOW });
-
-/**
- * `body` with `pattern` rewritten, and **loud when it rewrote nothing**.
- *
- * A doctoring that silently stops matching leaves its test asserting against an
- * undoctored page — which is exactly how the degenerate-signature guard rotted:
- * the literal `39.183` stopped matching the moment the fixture was recaptured,
- * the replace became a no-op, and the test went on passing
- * ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)). Throwing
- * here is what makes that failure loud instead.
- *
- * Doctor where the **parser** reads, not where the markup happens to be
- * styled: a utility class is not an anchor, and a restyle would disarm the
- * test without breaking the parser.
- */
-function rewrite(body: string, pattern: RegExp, replacement: string, what: string): string {
-  const doctored = body.replace(pattern, replacement);
-  if (doctored === body) throw new Error(`nothing matched when doctoring ${what}`);
-  return doctored;
-}
-
-/**
- * A fixture with the summary the parser reads rewritten to `summary`, anchored
- * on **the element** rather than on the fixture's own counts — `rewrite`'s
- * guard, specialised to the one doctoring four tests all need.
- */
-function withSummary(name: string, summary: string): string {
-  const page = fixture(name);
-  const doctored = page.replace(/(id="srp-breadcrumb-summary"[^>]*>)[^<]*/u, `$1${summary}`);
-  if (doctored === page) throw new Error(`${name}: no #srp-breadcrumb-summary to rewrite`);
-  return doctored;
-}
 
 describe("the rows of a search results page", () => {
   it("drops the slots that carry no ad id, silently", () => {
@@ -178,6 +146,28 @@ describe("TOP listings", () => {
     // array length — which is 27 while the range reads 1 - 25 (SPEC 4.1).
     expect({ organic_count, promoted_count }).toEqual({ organic_count: 25, promoted_count: 2 });
     expect(listings).toHaveLength(27);
+  });
+
+  it("stay a handful per page: every fixture carries its full 25 organic rows", () => {
+    // The marker is structural — a direct-child `<svg>` — so a second one (a
+    // watchlist heart, say) would read as promoted and this is what would
+    // notice. A page's organic rows are its page size: 25 on every fixture
+    // captured, whatever the query (SPEC 4.3). A row mismarked as promoted
+    // takes one off that count, so the invariant is sharper than a bound on
+    // `promoted_count` alone.
+    for (const name of [
+      "search-page-1",
+      "search-page-50",
+      "search-page-51-clamped",
+      "search-wanted",
+      "search-old-dates",
+      "search-unlinked-title",
+    ]) {
+      const { organic_count, promoted_count, listings } = parse(name);
+      expect({ name, organic_count }).toEqual({ name, organic_count: 25 });
+      expect(promoted_count).toBeLessThanOrEqual(2);
+      expect(listings).toHaveLength(organic_count + promoted_count);
+    }
   });
 
   it("carry no posting date, which the row reports as null", () => {

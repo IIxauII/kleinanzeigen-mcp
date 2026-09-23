@@ -19,7 +19,7 @@ So the rule became literal. **Unmatched by any `Disallow` means allowed.** Inten
 Consequences of the switch, in both directions:
 
 - The 5-page cap fell, and the ceiling rose from ≈130 to **1 250** organic listings per query.
-- Three unmatched paths are taken deliberately: slugless `/s-seite:N/…` pagination, `…brandProfile.getAds`, and `…brandingIndex.searchBrandings`. None of `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` or `/pro/` appears anywhere in the file's 252 `*` rules.
+- Three unmatched paths are taken deliberately: slugless `/s-seite:N/…` pagination, `…brandProfile.getAds`, and `…brandingIndex.searchBrandings`. **Since [#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81) the first of those is no longer constructed** — the redesign made paging a `?pageNum=` query on a slugged path, and the `seite:50` form now only arrives as the clamp's own redirect, followed and never emitted (SPEC 2.3, 2.4). The reasoning below is unchanged and stands as the record: the path was taken on the literal rule, and dropping it cost nothing the rule granted. None of `unternehmensseiten`, `verzeichnis`, `_actions`, `brandingIndex`, `searchBrandings`, `brandProfile` or `/pro/` appears anywhere in the file's 252 `*` rules.
 - The `r{km}` radius question went moot rather than being won — `?radius=` covers radius entirely on any allowed URL, so nothing rode on the path spelling either way.
 - Nothing else reopened. The refusals of `/api`, `/s-kategorie-baum.html` and `/s-suchanfrage.html` rest on rules the file actually wrote.
 

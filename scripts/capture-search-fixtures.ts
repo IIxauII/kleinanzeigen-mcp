@@ -58,10 +58,16 @@ const PAGES = [
   { name: "search-page-50", url: `${ORIGIN}/s-suche/k0?keywords=fahrrad&pageNum=50` },
   { name: "search-page-51-clamped", url: `${ORIGIN}/s-suche/k0?keywords=fahrrad&pageNum=51` },
   // `zu verschenken` is the want-listing query whose page carries all four
-  // price shapes at once (SPEC 3.1).
+  // price shapes at once (SPEC 3.1). The query changed with #81 and the change
+  // is load-bearing, not incidental: the previous
+  // `keywords=fahrrad&adType=WANTED` now renders only `Fixed`, `Negotiable` and
+  // `Unpriced` — no `Giveaway` — so restoring it silently drops a shape the
+  // parser tests assert.
   { name: "search-wanted", url: `${ORIGIN}/s-suche/k0?keywords=zu%20verschenken&adType=WANTED` },
   // Narrow enough that page 1 spans days, which is the only way to see the
   // other two date spellings — `Gestern, HH:MM` and `DD.MM.YYYY` (SPEC 3.2).
+  // Narrowed from `cinelli` with #81 for that reason: plain `cinelli` now fills
+  // page 1 from a single day, and the `DD.MM.YYYY` spelling vanishes with it.
   { name: "search-old-dates", url: `${ORIGIN}/s-suche/k0?keywords=cinelli%20supercorsa` },
   // An honest empty set, which is a normal result only because §5.4 removed
   // the block that presents the same way (SPEC 5.6, 6.3).
@@ -110,7 +116,7 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
 
     const article = $li.find("article[data-adid]").first();
     if (article.length === 0) {
-      // An ad banner: 5–8 per page, dropped silently by the parser (SPEC 5.1).
+      // An ad banner: 5–7 per page here, dropped silently by the parser (SPEC 5.1).
       // The slot is kept so the fixture still contains what has to be dropped.
       rows.push($.html($li));
       return;
