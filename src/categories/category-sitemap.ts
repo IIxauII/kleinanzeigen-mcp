@@ -4,7 +4,7 @@ import { ParseError } from "../fetch/errors.ts";
 /**
  * The whole taxonomy in one ~2 KB file, and the only complete source for it:
  * its id set is byte-identical to the disallowed `/s-kategorie-baum.html` tree,
- * while the homepage nav silently omits three of the 159 nodes (SPEC 7).
+ * while the homepage nav silently omits three of the 161 nodes (SPEC 7).
  */
 export const CATEGORIES_SITEMAP_URL = "https://www.kleinanzeigen.de/sitemap_categories.xml";
 

@@ -23,9 +23,9 @@ describe("the bundled category tree", () => {
     expect(loadCategoryTree(BUNDLED)).toBe(first);
   });
 
-  it("carries all 159 nodes across exactly two levels", () => {
+  it("carries all 161 nodes across exactly two levels", () => {
     const tree = loadCategoryTree(BUNDLED);
-    expect(tree).toHaveLength(159);
+    expect(tree).toHaveLength(161);
     expect(tree.filter((node) => node.parent_id === null)).toHaveLength(15);
   });
 

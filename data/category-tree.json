@@ -272,6 +272,14 @@
     "parent_name": "Elektronik"
   },
   {
+    "category_id": 407,
+    "name": "Telefone & Fax",
+    "slug": "telefone-fax",
+    "path": "/s-telefone-fax/c407",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
     "category_id": 245,
     "name": "Foto",
     "slug": "foto",
@@ -281,7 +289,7 @@
   },
   {
     "category_id": 173,
-    "name": "Handy & Telefon",
+    "name": "Smartphones",
     "slug": "handy-telekom",
     "path": "/s-handy-telekom/c173",
     "parent_id": 161,
@@ -292,6 +300,14 @@
     "name": "Haushaltsgeräte",
     "slug": "haushaltsgeraete",
     "path": "/s-haushaltsgeraete/c176",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 408,
+    "name": "Kommunikation & Funk",
+    "slug": "kommunikation-funk",
+    "path": "/s-kommunikation-funk/c408",
     "parent_id": 161,
     "parent_name": "Elektronik"
   },

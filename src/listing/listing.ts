@@ -65,7 +65,7 @@ export type Seller = z.infer<typeof SellerSchema>;
  * The machine keys — `autos.km_i`, `global.zustand` — live in `robots.txt` and
  * in filter URLs but **not in this page's DOM**, so the typed key and the
  * readable value are on different surfaces. A mapping table for ~40
- * unenumerable keys across 159 categories has no verification path, and a
+ * unenumerable keys across 161 categories has no verification path, and a
  * half-populated typed field is worse than an honest untyped one.
  */
 export const AttributeSchema = z.object({ label: z.string(), value: z.string() });

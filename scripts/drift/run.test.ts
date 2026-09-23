@@ -289,8 +289,8 @@ describe("one run over both datasets", () => {
 describe("the datasets the run diffs against", () => {
   it("reads the committed data/, through the same schemas the server uses", () => {
     const datasets = readBundledDatasets();
-    // 159 categories and 16 + 11 215 locations, as SPEC 7 records them.
-    expect(datasets.categories.size).toBe(159);
+    // 161 categories and 16 + 11 215 locations, as SPEC 7 records them.
+    expect(datasets.categories.size).toBe(161);
     expect(datasets.categories.get(210)).toBe("Auto, Rad & Boot");
     expect(datasets.locations.size).toBeGreaterThan(11000);
     expect(datasets.locations.get(3331)).toBe("Berlin");
