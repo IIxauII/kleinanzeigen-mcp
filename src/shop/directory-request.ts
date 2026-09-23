@@ -73,7 +73,7 @@ export type FindShopArgs = z.infer<typeof BaseArgsSchema>;
  *
  * **`location_id` is deliberately not checked the same way**, and the
  * difference is the datasets rather than the ids. The category tree is
- * complete — 159 of 159 nodes, byte-identical to the disallowed tree — while
+ * complete — 161 of 161 nodes, byte-identical to the disallowed tree — while
  * the city dataset knowingly holds the first two tiers only: sub-Ortsteile
  * (Wedding `l3503`) and the whole postcode layer are absent from every allowed
  * source (SPEC 7's correction). Refusing `l3503` would reject an id the

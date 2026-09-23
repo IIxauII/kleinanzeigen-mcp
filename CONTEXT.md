@@ -81,7 +81,7 @@ The numeric identifier of a category, written `c217`. The only valid handle for 
 The two levels of the taxonomy. There is no third.
 
 **Category tree** _(Kategoriebaum)_:
-The complete taxonomy, 159 nodes.
+The complete taxonomy, 161 nodes.
 
 **Dataset drift** _(Datensatzdrift)_:
 A bundled build-time artefact falling out of step with the site. The genus; *Category drift* and *Location drift* are its two species, and one **drift check** covers both. The check **reads and reports and writes nothing** ([ADR-0002](./docs/adr/0002-nothing-on-disk-nothing-survives-the-process.md)): dataset drift is fixed by regenerating the dataset and shipping a new version, never by a runtime write. It moves **between releases**, which is what separates it from *Drift* — that one moves between requests.

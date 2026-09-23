@@ -268,7 +268,7 @@ type Listing = {
 };
 ```
 
-**Attributes are verbatim German label/value pairs in rendered order** — `{ label: "Zustand", value: "Sehr Gut" }` — with no key mapping. The machine keys (`autos.km_i`, `global.zustand`) exist in `robots.txt` and in filter URLs but **not in the detail page's DOM**, so the typed key and the readable value live on different surfaces. A mapping table for ~40 unenumerable keys across 159 categories has no verification path, and a half-populated typed field is worse than an honest untyped one.
+**Attributes are verbatim German label/value pairs in rendered order** — `{ label: "Zustand", value: "Sehr Gut" }` — with no key mapping. The machine keys (`autos.km_i`, `global.zustand`) exist in `robots.txt` and in filter URLs but **not in the detail page's DOM**, so the typed key and the readable value live on different surfaces. A mapping table for ~40 unenumerable keys across 161 categories has no verification path, and a half-populated typed field is worse than an honest untyped one.
 
 **Images are exactly what the page gave.** Search returns the `$_2` thumbnail plus `image_count`; `get_listing` returns the large gallery URLs plus the count. Stripping `rule=` and documenting the size grammar would mean owning a URL vocabulary we neither control nor version.
 
@@ -368,7 +368,7 @@ That last line is the through-line of the whole surface. Agents read values, not
 | `find_location` | **0** | local, over the bundled city dataset |
 | `find_shop` | exactly 1 | the odd resolver out |
 
-**Discovery is tools, not MCP resources.** 159 categories and 11 091 locations are exactly the static documents resources exist for, and resources were rejected anyway: the resolvers do not *serve* data, they **refuse to guess**. 12 slugs collide across 25 nodes, names collide too, and a shop-name match may not be a name match at all — so matching must report candidates, which is behaviour a document cannot do. Agents also pull resources unreliably, which would make the collision guard optional in practice.
+**Discovery is tools, not MCP resources.** 161 categories and 11 091 locations are exactly the static documents resources exist for, and resources were rejected anyway: the resolvers do not *serve* data, they **refuse to guess**. 12 slugs collide across 25 nodes, names collide too, and a shop-name match may not be a name match at all — so matching must report candidates, which is behaviour a document cannot do. Agents also pull resources unreliably, which would make the collision guard optional in practice.
 
 **`describe_category` is out.** It would describe filters you cannot apply (§2.6) — a footgun wearing a helpful hat.
 
@@ -527,7 +527,7 @@ find_location({ query: string })
 
 **Both always return a list, never a bare object, even on an exact single hit.** A shape that sometimes resolves for you is a shape that teaches the caller to stop reading. The never-guess rule only holds if the caller cannot skip the check, and a `best:` hint would be the same guess wearing a different name.
 
-Matching is **case- and diacritic-insensitive** against the name and against a qualified `"Parent > Child"` form. **No fuzzy / edit-distance matching** — 159 known strings and an LLM caller; approximate matching buys little and turns a loud failure into a quiet one. **Never match on a slug**: slugs are cosmetic URL segments and collide 25 ways.
+Matching is **case- and diacritic-insensitive** against the name and against a qualified `"Parent > Child"` form. **No fuzzy / edit-distance matching** — 161 known strings and an LLM caller; approximate matching buys little and turns a loud failure into a quiet one. **Never match on a slug**: slugs are cosmetic URL segments and collide 25 ways.
 
 Zero matches is `{ matches: [], count: 0 }` — an answer.
 
@@ -572,7 +572,7 @@ Envelope & {
 
 Never auto-selected, even at `count: 1` — **and here that rule is a correctness guard, not a homonym guard.** `fulltext` matches **profile prose, not just names**: `"decathlon"` returns `TGW Systems Integration GmbH`, whose `about` text merely names Decathlon as a customer, and `searchScope: "BRANDING"` does not exclude it. **A single exact hit can still be the wrong shop.**
 
-> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** "Validated against the bundled trees" holds for **`category_id` and not for `location_id`**, and the difference is the datasets rather than the ids. The filter ids *are* the same numeric ids — the same id **space** — but the two bundled sets are not the same shape of complete. The category tree is complete: 159 of 159 nodes, byte-identical to the disallowed tree (§7). The city dataset knowingly is not: it holds the location tree's first two tiers, and **sub-Ortsteile (Wedding `l3503`) and the entire postcode layer are absent from every allowed source** (§7's correction).
+> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** "Validated against the bundled trees" holds for **`category_id` and not for `location_id`**, and the difference is the datasets rather than the ids. The filter ids *are* the same numeric ids — the same id **space** — but the two bundled sets are not the same shape of complete. The category tree is complete: 161 of 161 nodes, byte-identical to the disallowed tree (§7). The city dataset knowingly is not: it holds the location tree's first two tiers, and **sub-Ortsteile (Wedding `l3503`) and the entire postcode layer are absent from every allowed source** (§7's correction).
 >
 > So refusing `l3503` would reject an id the directory filters by and answers **honestly** — the opposite of the failure the check exists to prevent — and a caller can hold such an id legitimately, since the third number in a listing URL is a location id (§2.2). The category id is checked; the location id is passed through to the site, which is the authority for it.
 
@@ -829,12 +829,12 @@ Reading is not writing; ADR-0002's invariant is untouched.
 
 | Dataset | Source | Size | Contents |
 | --- | --- | --- | --- |
-| `category-tree.json` | `GET /sitemap_categories.xml` (2 094 B) + `GET /` for labels | tiny | all **159** nodes, 2 levels, id + German name + slug + path |
+| `category-tree.json` | `GET /sitemap_categories.xml` (2 094 B) + `GET /` for labels | tiny | all **161** nodes, 2 levels, id + German name + slug + path |
 | `cities.json` | `GET /sitemap_cities.xml` (798 561 B) | ~84 KB gzipped | **11 091** locations, slug + id |
 
 **Both are build-time GETs run by a maintainer, not by the server.**
 
-**Category tree provenance.** The sitemap's id set is **byte-identical** to the disallowed `/s-kategorie-baum.html` tree — 159 ids, zero added, zero missing — and it is depth-first, so partitioning at the 15 L1 markers recovers every parent's child set exactly. The homepage nav confirms the same 15 partitions independently but **silently omits 3 of 159 nodes** (`c286 Bahn & ÖPNV`, `c269 Beauty & Gesundheit`, `c273 Tauschen`) — absent from the HTML, not collapsed behind a toggle. **Only the sitemap is complete; the homepage is a label convenience, not a source of truth.** The 3 missing labels are recovered from their parents' browse pages.
+**Category tree provenance.** The sitemap's id set is **byte-identical** to the disallowed `/s-kategorie-baum.html` tree — 161 ids, zero added, zero missing — and it is depth-first, so partitioning at the 15 L1 markers recovers every parent's child set exactly. The homepage nav confirms the same 15 partitions independently but **silently omits 3 of 161 nodes** (`c286 Bahn & ÖPNV`, `c269 Beauty & Gesundheit`, `c273 Tauschen`) — absent from the HTML, not collapsed behind a toggle. **Only the sitemap is complete; the homepage is a label convenience, not a source of truth.** The 3 missing labels are recovered from their parents' browse pages.
 
 **City dataset gaps, hard-coded.** `sitemap_cities.xml` omits the three city-states — Berlin `l3331`, Hamburg `l9409`, Bremen `l1` — which appear only as `/stadt/` landing pages. **Hard-code those three ids.** Also absent: sub-Ortsteile (e.g. Wedding `l3503`) and the entire postcode layer, whose ids are unobtainable from any allowed source. Postcodes still work as input, via `?locationStr=`.
 
@@ -857,7 +857,7 @@ Four things about it are decisions, not implementation detail:
 
 A GitHub Actions runner **is** served by the site: three runs from `ubuntu-latest` on three distinct Azure IPs returned HTTP 200 with no redirect, no `Retry-After` and no interstitial, on both gateway routes the check touches (`sitemaps` for the sitemap leg, `k-desktop` for the 17 katalog requests). ADR-0003 was never put to the test, because there was no block to route around. What is **not** established is durability — three runs inside three minutes, and Azure ranges are exactly what a future tightening would target. The cron's own exit status is the monitor for this answer expiring: a check that starts failing on the network leg rather than on real drift is the signal.
 
-The live category set was **159 as of 2026-09-08**, byte-for-byte the count in `data/category-tree.json`. The check is cheap in requests but not in bytes — one katalog state page is 583 KB and the root 137 KB, so a full run is multi-megabyte. Irrelevant to a monthly cron; worth knowing before anyone proposes running it per-PR.
+The live category set was **161 as of 2026-09-23**, byte-for-byte the count in `data/category-tree.json`. The check is cheap in requests but not in bytes — one katalog state page is 583 KB and the root 137 KB, so a full run is multi-megabyte. Irrelevant to a monthly cron; worth knowing before anyone proposes running it per-PR.
 
 **The shop directory is deliberately not bundled**, on four independent grounds: `liveAds` is a live inventory count a snapshot would freeze; the ordering reseeds nightly (`randomizationSeed` is the date); `totalHits` drifted 53 811 → 53 808 inside 30 minutes; and the sweep is 1 077 requests ≈ 27 minutes.
 
