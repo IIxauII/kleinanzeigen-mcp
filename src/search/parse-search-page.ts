@@ -224,7 +224,17 @@ export function parseSearchPage(body: string, options: ParseOptions): SearchPage
     // they are dropped **silently** (SPEC 5.1).
     if (article.length === 0) return;
     // A TOP row is marked by its corner-ribbon `<svg>`, a direct child of the
-    // slot; an organic row has no direct `<svg>` child.
+    // slot; an organic row has no direct `<svg>` child. The ribbon carries no
+    // identity of its own — no `data-title`, unlike `locationOutline` — so
+    // this is a structural marker rather than an identifying one, and a second
+    // direct-child `<svg>` (a watchlist heart, say) would read as promoted.
+    //
+    // Deliberately not tightened to the ribbon's dimensions or utility
+    // classes, which are weaker anchors still. The consequence is bounded:
+    // `posting()` parses a date it can see **before** it consults `promoted`,
+    // so a mismarked row still reports its real date. Only a row that is both
+    // mismarked *and* dateless would turn §5.8's loud failure quiet, and a row
+    // losing its date is itself the DOM change that §5.8 exists to catch.
     listings.push(parseRow($, article, li.children("svg").length > 0, options.now));
   });
 

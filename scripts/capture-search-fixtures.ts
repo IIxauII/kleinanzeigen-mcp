@@ -110,7 +110,7 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
 
     const article = $li.find("article[data-adid]").first();
     if (article.length === 0) {
-      // An ad banner: 5 per page, dropped silently by the parser (SPEC 5.1).
+      // An ad banner: 5–8 per page, dropped silently by the parser (SPEC 5.1).
       // The slot is kept so the fixture still contains what has to be dropped.
       rows.push($.html($li));
       return;
@@ -120,7 +120,7 @@ function minimise($: cheerio.CheerioAPI, name: string): string {
     const href = `/s-anzeige/${redact.slug(index)}/${adId}-217-0000`;
     article.attr("data-adid", adId).attr("data-href", href);
     article.find("a[href^='/s-anzeige/']").attr("href", href);
-    // A PRO row also links its shop page; the slug names the business.
+    // A commercial seller's row also links its shop page; the slug names the business.
     article.find("a[href^='/pro/']").attr("href", `/pro/synthetischer-shop-${index}`);
     article.find("a[aria-label]").attr("aria-label", redact.title(index));
 

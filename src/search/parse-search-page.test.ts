@@ -19,14 +19,29 @@ const parse = (name: string, page = 1, degenerateForm = false) =>
   parseSearchPage(fixture(name), { page, degenerateForm, now: NOW });
 
 /**
- * A fixture with the summary the parser reads rewritten to `summary`, anchored
- * on **the element** rather than on the fixture's own counts.
+ * `body` with `pattern` rewritten, and **loud when it rewrote nothing**.
  *
- * Anchoring on a count is what let the degenerate-signature guard rot: the
- * literal `39.183` stopped matching the moment the fixture was recaptured, the
- * replace became a silent no-op, and the test went on passing against an
- * undoctored page ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).
- * Throwing when nothing was rewritten is what makes that failure loud instead.
+ * A doctoring that silently stops matching leaves its test asserting against an
+ * undoctored page — which is exactly how the degenerate-signature guard rotted:
+ * the literal `39.183` stopped matching the moment the fixture was recaptured,
+ * the replace became a no-op, and the test went on passing
+ * ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)). Throwing
+ * here is what makes that failure loud instead.
+ *
+ * Doctor where the **parser** reads, not where the markup happens to be
+ * styled: a utility class is not an anchor, and a restyle would disarm the
+ * test without breaking the parser.
+ */
+function rewrite(body: string, pattern: RegExp, replacement: string, what: string): string {
+  const doctored = body.replace(pattern, replacement);
+  if (doctored === body) throw new Error(`nothing matched when doctoring ${what}`);
+  return doctored;
+}
+
+/**
+ * A fixture with the summary the parser reads rewritten to `summary`, anchored
+ * on **the element** rather than on the fixture's own counts — `rewrite`'s
+ * guard, specialised to the one doctoring four tests all need.
  */
 function withSummary(name: string, summary: string): string {
   const page = fixture(name);
@@ -37,9 +52,12 @@ function withSummary(name: string, summary: string): string {
 
 describe("the rows of a search results page", () => {
   it("drops the slots that carry no ad id, silently", () => {
-    // 34 `<li>` on the live page, 7 of them ad banners (SPEC 5.1).
+    // 34 slots in the results table on the live page, 7 of them ad banners
+    // (SPEC 5.1). Counted inside `#srchrslt-adtable`, because an `<li>`
+    // anywhere else on the page is not a slot and must not inflate this.
     const page = parse("search-page-1");
-    expect(fixture("search-page-1").match(/<li /gu)).toHaveLength(34);
+    const table = /id="srchrslt-adtable"[\s\S]*?<\/ul>/u.exec(fixture("search-page-1"));
+    expect(table?.[0].match(/<li[\s>]/gu)).toHaveLength(34);
     expect(page.listings).toHaveLength(27);
     expect(page.listings.every((listing) => listing.ad_id !== "")).toBe(true);
   });
@@ -258,9 +276,11 @@ describe("the loud failures", () => {
   it("throws when an organic row lost its date cell, which only a TOP row honestly lacks", () => {
     // A TOP row's missing date is normal; the same emptiness on an organic
     // row is a DOM change and must not arrive as null (SPEC 3.3's correction).
-    const doctored = fixture("search-page-1").replaceAll(
+    const doctored = rewrite(
+      fixture("search-page-1"),
       /<span>(?:Heute|Gestern)[^<]*<\/span>/gu,
       "<span></span>",
+      "the posting dates",
     );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /organic row \d+ has no posting date/u,
@@ -270,9 +290,11 @@ describe("the loud failures", () => {
   it("throws when a row carries neither heading the site renders", () => {
     // Losing the anchor is the site's own unlinked variant and normal; losing
     // both it and the unlinked span is a DOM change, and shouts (SPEC 5.8).
-    const doctored = fixture("search-unlinked-title").replaceAll(
+    const doctored = rewrite(
+      fixture("search-unlinked-title"),
       /<h3[^>]*>[\s\S]*?<\/h3>/gu,
       "<h3></h3>",
+      "the row headings",
     );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /row \d+ has no title/u,
@@ -280,12 +302,21 @@ describe("the loud failures", () => {
   });
 
   it("throws when a row has a description on neither surface", () => {
-    const doctored = fixture("search-page-1")
-      .replaceAll(/<script type="application\/ld\+json">[\s\S]*?<\/script>/gu, "")
-      .replaceAll(
-        /<p class="mb-xsmall text-bodyRegular text-onSurfaceSubdued">[\s\S]*?<\/p>/gu,
-        "",
-      );
+    // The snippet is doctored where the **parser** finds it — the `<p>` right
+    // after the `</h3>` — not by the utility classes that happen to be on it
+    // today, which a restyle would change without the parser noticing.
+    const stripped = rewrite(
+      fixture("search-page-1"),
+      /<script type="application\/ld\+json">[\s\S]*?<\/script>/gu,
+      "",
+      "the ld+json blocks",
+    );
+    const doctored = rewrite(
+      stripped,
+      /(<\/h3>\s*)<p[^>]*>[\s\S]*?<\/p>/gu,
+      "$1",
+      "the visible description snippets",
+    );
     expect(() => parseSearchPage(doctored, { page: 1, degenerateForm: false, now: NOW })).toThrow(
       /has no description on either surface/u,
     );

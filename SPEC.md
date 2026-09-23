@@ -646,7 +646,7 @@ These have appeared identically across five languages of scraper spanning 2021�
 | Anchor | Reads |
 | --- | --- |
 | `#srchrslt-adtable` | the results container |
-| its direct `li` children | a row slot — **~5 per page carry no `data-adid` and are ad banners; drop them silently** |
+| its direct `li` children | a row slot — **5–8 per page carry no `data-adid` and are ad banners; drop them silently** |
 | `article[data-adid]` | a listing row; `data-adid` is the ad id |
 | a slot's direct child `<svg>` | the corner ribbon marking a TOP listing → `promoted: true` |
 | `#srp-breadcrumb-summary` | `N - M von T` — **numbers only**, see §5.5 |
@@ -658,12 +658,14 @@ These have appeared identically across five languages of scraper spanning 2021�
 | that `<div>`'s next sibling | the posting date — **absent entirely on a TOP row** |
 | `[data-image-container] img` | the thumbnail |
 | `[data-image-container] div.absolute.bottom-xsmall` | the image counter; no counter means exactly one image |
-| `[data-dhl-promotion]` | `Gesuch` → `listing_type: "WANTED"`; `Versand möglich` → `shipping: true`; `Direkt kaufen` |
+| `[data-dhl-promotion]` | the spans the badges ride — `Gesuch` → `listing_type: "WANTED"`; `Versand möglich` → `shipping: true`; `Direkt kaufen`. **Not badge-specific**, see below |
 | the row's `ld+json` | the ~200-char description, longer than the visible snippet |
 
 > **Correction, recorded while fixing the redesign regression ([#81](https://github.com/IIxauII/kleinanzeigen-mcp/issues/81)).** The opening claim above — *"it is the anti-bot layer that churns, not the DOM"* — did not hold. The results page was rewritten from semantic class names to headings, utility classes and data attributes, and **every** search anchor in the table moved; the table above is the post-redesign set. `#srchrslt-adtable` and `article[data-adid]` are the two that survived, and the listing-detail and shop anchors below were untouched.
 >
 > The shape of the change is worth recording, because it says what to expect next time: the semantic, hand-written class names (`aditem-main--middle--price-shipping--price`, `galleryimage--counter`, `simpletag`, `ad-listitem`, `is-topad`) were replaced either by **utility classes** that describe rendering rather than meaning, or by **data attributes** and **icon `data-title`s**. Utility classes are the weaker anchor of the two — `p.text-title3.font-strong` names a type scale, and a redesign that restyles the price breaks it — so where the markup offered both, the data attribute was taken. `svg[data-title='locationOutline']` is deliberately an icon identity rather than a position: the location and date `<div>`s are otherwise indistinguishable siblings.
+>
+> **One data attribute is weaker than it looks.** `[data-dhl-promotion]` is **not** a badge marker despite its name: in `search-wanted` it wraps `2 km` and `EZ 12/2004` as well as `Gesuch` and `Versand möglich`. It is a generic span marker the badges happen to ride. Nothing is read *from* the attribute — the tag strings are compared exactly (`tags.includes("Gesuch")`), so a stray member is inert — but it is a **set the site may re-scope**, and if it ever stops covering the badges, `listing_type` degrades silently to `OFFER` rather than shouting. That is the one anchor in this table whose loss would not be loud, and §5.8 says such a place must be known.
 >
 > Two anchors were dropped rather than migrated, because the elements no longer exist: `li.is-highlight` (a highlighted listing, never surfaced) and `a.pagination-page` (present but never used for navigation — pages are addressed directly, §2.5). Neither occurs in the recaptured fixtures.
 >
