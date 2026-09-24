@@ -14,6 +14,12 @@
 # version; the MCPB asset is uploaded before it too, because the registry does a
 # redirect-refusing `HEAD` on the asset URL (`docs/maintenance.md`).
 #
+# Landing is not the same as being readable. npm answers the publish before
+# `registry.npmjs.org/<pkg>/<version>` exists — minutes before, measured — while
+# the two steps run seconds apart, so the registry step blocks on that document
+# and retries the registry's propagation 400 (#84). Plugin order cannot express
+# that: it sequences the calls and says nothing about read-after-write.
+#
 # **Never triggered by a push to `main`.** The drift gate is network-dependent
 # and has no override, so automatic-on-merge releasing would redden `main` in
 # any month the site was unreachable — and a red `main` nobody can act on is a
@@ -117,6 +123,15 @@ jobs:
       # The CI half of the login, and the reason `id-token: write` is not the
       # npm publish's alone. No secret: `github-oidc` exchanges the job's own
       # token for the `io.github.IIxauII/*` namespace.
+      #
+      # This is a **pre-flight, not the credential the publish uses**. The
+      # registry issues five-minute tokens, and the publish is minutes away —
+      # behind the drift gate, the npm publish, the build, the pack, the
+      # release and a wait for npm to serve what it published — so
+      # `scripts/publish-registry.ts` logs in again for every attempt (#84).
+      # What this step buys is the cheap early answer: a misconfigured OIDC
+      # context fails here, in seconds, rather than after the gate has spent 19
+      # requests on the site and npm has the version.
       - name: Log in to the MCP Registry over OIDC
         run: mcp-publisher login github-oidc
 

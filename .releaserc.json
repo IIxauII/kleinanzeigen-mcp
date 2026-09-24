@@ -36,7 +36,7 @@
     [
       "@semantic-release/exec",
       {
-        "publishCmd": "node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher validate && mcp-publisher publish"
+        "publishCmd": "node scripts/await-npm-version.ts ${nextRelease.version} && node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher validate && node scripts/publish-registry.ts ${nextRelease.version}"
       }
     ]
   ]
