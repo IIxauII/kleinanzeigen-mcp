@@ -112,7 +112,7 @@ The publish step authenticates over **OIDC**, not with a token: the job carries 
 | 6 | `exec` — `prepareCmd` | `stamp-version.ts` → `build` → `pack:mcpb`, in that order: the build has to see the stamped `manifest.json` and `src/version.ts` |
 | 7 | `git` | commits back what 3, 5 and 6 wrote |
 | 8 | `github` | the release, with the `.mcpb` attached |
-| 9 | `exec` — `publishCmd` | `stamp-server-json.ts` → `mcp-publisher validate` → `publish`, **after** 5 and 8 |
+| 9 | `exec` — `publishCmd` | `await-npm-version.ts` → `stamp-server-json.ts` → `mcp-publisher validate` → `publish-registry.ts`, **after** 5 and 8 — the wait first, because plugin order puts 5 seconds ahead of this step and npm takes minutes to serve what it published ([#84](https://github.com/IIxauII/kleinanzeigen-mcp/issues/84)) |
 
 Before any of it, the workflow runs `npm run build && npm test`. That is SPEC §8.6's other half — the cold-install verification "runs on every PR and again as a pre-publish gate" — and it goes first because it is the cheap local answer: a broken build should not spend 19 requests on the site to find out.
 
@@ -158,11 +158,24 @@ The stamp is a script rather than the reference workflow's one line of `jq` beca
 
 **`validate` cannot catch a forgotten stamp.** Sixty-four zeros is schema-valid, so `mcp-publisher validate` passes on the unstamped file exactly as it does on the stamped one. The release must *run* the stamp; validation is not the guard, and the workflow is the only place that can be.
 
-`mcp-publisher login github-oidc` is the CI half of the login and needs `id-token: write`. That permission is **not** this step's alone any more — the npm publish in the same dispatch authenticates the same way — so it belongs at job level rather than being treated as a registry-specific quirk.
+`mcp-publisher login github-oidc` is the CI half of the login and needs `id-token: write`. That permission is **not** this step's alone any more — the npm publish in the same dispatch authenticates the same way — so it belongs at job level rather than being treated as a registry-specific quirk. It runs twice in a dispatch, once in the workflow and once per publish attempt, and the paragraphs above say why.
 
 The asset URL the stamp builds carries `v<version>`, which is `semantic-release`'s default `tagFormat`. A release config that changes it points the registry at a tag that does not exist — and the failure is the registry's `HEAD`, not a test.
 
 Ownership is proven by `mcp-publisher login github` (which grants `io.github.<login>/*`) plus `mcpName` in the **already published** npm version — the registry reads it out of `registry.npmjs.org/<pkg>/<version>`, so the npm publish has to have landed first. `repository.url` is documentation, not proof; nothing checks it against the authenticated identity.
+
+**Landing is not the same as being readable, and the gap is minutes.** npm answers the publish before `registry.npmjs.org/<pkg>/<version>` exists — *"Your package is being processed and may take a few minutes to become available"* is npm saying so — while `@semantic-release/npm` and this step run in the same `publish` lifecycle a few seconds apart. On the 1.0.1 release that was **3.4 seconds**, and the version document first answered 200 between two and three minutes later; the step lost the race and 400'd ([#84](https://github.com/IIxauII/kleinanzeigen-mcp/issues/84)). 1.0.0 got lucky.
+
+Plugin order cannot fix that — it sequences the calls and says nothing about read-after-write — so the ordering the paragraph above documents is now *enforced*, by two scripts either side of the stamp:
+
+- **`scripts/await-npm-version.ts <version>`** polls `registry.npmjs.org/<pkg>/<version>` until it answers 200 with a document carrying that `version` and this package's `mcpName`, the two fields the registry reads. It is bounded — ten minutes, then a non-zero exit — because a package that never appears is a publish that failed, and an unbounded wait turns that into a job nobody can read. A 200 whose `mcpName` is wrong fails **immediately** rather than at the deadline: npm metadata is immutable, so waiting cannot repair it and burying the message would only cost the hour it takes to work that out.
+- **`scripts/publish-registry.ts <version>`** runs `mcp-publisher login github-oidc` and then `mcp-publisher publish`, and retries **only** the propagation 400 — five attempts, 30 s apart. Our reader and the registry's are different clients of a CDN-fronted npm, so a 200 here does not prove a 200 there, and the registry's own message asks the caller to wait and retry. The match is deliberately narrow: the status, the npm-package phrasing and *this* release's version all have to appear. Every other failure on this step is permanent — the casing 403, a `HEAD` on an asset that is not there — and a blanket retry would spend two minutes re-reporting it. A registry that respells the message turns the retry **off**, back to the single attempt it replaced.
+
+**The login is in that script and not only in the workflow, because the registry's token is minutes long.** `tokenDuration: 5 * time.Minute` in the registry's own JWT manager, which is why its reference workflow puts `login` in the step immediately before `publish`. This release cannot do that — the publish happens inside `semantic-release`, behind the drift gate, the npm publish, the build, the pack, the commit-back and the GitHub release, and now behind a wait that may run for ten minutes as well. A token taken before all of that is expired before it is used, and **a 401 is not a propagation 400**, so nothing would retry it: the fix would have swapped one unrecoverable last-step failure for another. Every attempt therefore mints its own token, and a login that fails is returned red immediately rather than retried — a credential says the same thing thirty seconds later.
+
+The workflow's own `mcp-publisher login github-oidc` step stays where it is, and is now a **pre-flight rather than the credential**: it fails a misconfigured OIDC context in seconds, before the drift gate spends 19 requests on the site and before npm has been touched. It is the same reasoning that puts `npm run build && npm test` ahead of the gate.
+
+**The failure this prevents is unrecoverable by re-dispatch.** It lands on the last step, so nothing before it rolls back: npm has the version, `v<x>` is tagged, the release and its `.mcpb` exist, `CHANGELOG.md` is written and the release commit is on `main`. A re-dispatch finds no commits after the tag, reports no new release and never reaches this step again. The only route back is the by-hand sequence above.
 
 **If the first publish 403s, it is the casing.** `io.github.IIxauII/kleinanzeigen` is inferred from the registry's source rather than documented, and `mcpName` is immutable in npm metadata — a correction costs a version bump (SPEC §8.7).
 

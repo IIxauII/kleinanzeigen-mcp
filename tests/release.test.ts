@@ -2,7 +2,15 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POLL_INTERVAL_MS, awaitNpmVersion, npmVersionUrl } from "../scripts/await-npm-version.ts";
+import {
+  LOGIN_ARGS,
+  PUBLISH_RETRY_MS,
+  type PublisherRun,
+  type RunPublisher,
+  publishToRegistry,
+} from "../scripts/publish-registry.ts";
 import { PLACEHOLDER_SHA256, type ServerJson, stamped } from "../scripts/stamp-server-json.ts";
 import { VERSION_SITES, stampVersion, stampedSource } from "../scripts/stamp-version.ts";
 
@@ -243,8 +251,20 @@ describe("the release configuration", () => {
     // validation passes on the unstamped file exactly as it does on the stamped
     // one, and running the stamp is the only thing that covers that
     // (`docs/maintenance.md`).
+    // The wait is first in the chain, and it is there because plugin order
+    // cannot express what it enforces: order puts `@semantic-release/npm`
+    // before this step and stops there, while npm's read-after-write runs
+    // minutes behind its own publish — 3.4 seconds apart against a document
+    // that appeared two to three minutes later, on 1.0.1 (#84). It goes ahead
+    // of the stamp because the stamp is disk work there is no point doing
+    // before npm is ready, and the submission is wrapped rather than called
+    // directly because the registry's propagation 400 is retried and every
+    // other failure on this step is not.
     expect(String(options("@semantic-release/exec", "publishCmd").publishCmd)).toBe(
-      "node scripts/stamp-server-json.ts ${nextRelease.version} && mcp-publisher validate && mcp-publisher publish",
+      "node scripts/await-npm-version.ts ${nextRelease.version}" +
+        " && node scripts/stamp-server-json.ts ${nextRelease.version}" +
+        " && mcp-publisher validate" +
+        " && node scripts/publish-registry.ts ${nextRelease.version}",
     );
   });
 
@@ -336,5 +356,264 @@ describe("the release workflow", () => {
     for (const file of ["release.yml", "pr-checks.yml", "dataset-drift.yml", "plugin.yml"]) {
       expect(read(`.github/workflows/${file}`), file).not.toContain("NPM_TOKEN");
     }
+  });
+});
+
+/**
+ * The npm propagation wait (`scripts/await-npm-version.ts`).
+ *
+ * `@semantic-release/npm` and the registry step run seconds apart inside one
+ * `publish` lifecycle, and npm's read-after-write is not immediate: the 1.0.1
+ * release reached `mcp-publisher publish` **3.4 seconds** after `+ kanzeigen-mcp@1.0.1`,
+ * and `registry.npmjs.org/kanzeigen-mcp/1.0.1` first answered 200 two to three
+ * minutes later. Plugin order sequences the calls and says nothing about that
+ * gap, which is the whole of the bug ([#84](https://github.com/IIxauII/kleinanzeigen-mcp/issues/84)).
+ *
+ * Nothing about this fails anywhere a test would otherwise reach — it fails on
+ * a 400 from the registry, on the last step of a release that has already
+ * published everything else and cannot be re-run.
+ *
+ * Fake timers throughout, for the reason `scripts/lib/site.test.ts` uses them
+ * on the request gap: the waiting is the point, and a real clock would put
+ * minutes of wall clock in the suite to prove it (SPEC 8.6).
+ */
+describe("the npm propagation wait", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** The version document as npm serves it once the publish is readable. */
+  const document = (version: string, mcpName: string = pkg.mcpName): string =>
+    JSON.stringify({ name: pkg.name, version, mcpName });
+
+  const ok = (body: string): Response => new Response(body, { status: 200 });
+  const status = (code: number): Response => new Response("", { status: code });
+
+  /**
+   * `fetch`, answering the queue in order and then repeating its last answer
+   * forever — a wait is a loop, so "and then it keeps saying that" is the
+   * ordinary case rather than a special one.
+   */
+  function answers(...queue: (Response | Error)[]): typeof fetch & { urls: string[] } {
+    const urls: string[] = [];
+    const impl = (async (input: string | URL | Request) => {
+      urls.push(String(input));
+      const next = queue.length > 1 ? queue.shift()! : queue[0];
+      if (next === undefined) throw new Error("nothing queued");
+      if (next instanceof Error) throw next;
+      return next.clone();
+    }) as typeof fetch & { urls: string[] };
+    impl.urls = urls;
+    return impl;
+  }
+
+  const quiet = (): void => {};
+
+  it("reads the same document the registry proves ownership out of", () => {
+    // `docs/maintenance.md`: the registry reads `mcpName` out of
+    // `registry.npmjs.org/<pkg>/<version>`. Polling anything else — the
+    // packument, a `dist-tag`, `npm view` — would be waiting for a different
+    // fact than the one the publish turns on. The packument is the trap of the
+    // three: it answers 200 for a package whose newest version is the previous
+    // one, so a wait on it would pass instantly and prove nothing.
+    expect(npmVersionUrl(pkg.name, "9.9.9")).toBe("https://registry.npmjs.org/kanzeigen-mcp/9.9.9");
+  });
+
+  it("returns on the first read that answers, without spending an interval", async () => {
+    const fetchImpl = answers(ok(document("9.9.9")));
+
+    await expect(awaitNpmVersion("9.9.9", { fetchImpl, onAttempt: quiet })).resolves.toContain("9.9.9");
+
+    expect(fetchImpl.urls).toEqual(["https://registry.npmjs.org/kanzeigen-mcp/9.9.9"]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("polls through the 404 the race produces, and through a flaky read", async () => {
+    // The three ways the document is *not yet* readable, all of them transient
+    // and none of them a reason to fail the release: the 404 before npm has it,
+    // a CDN 5xx, and a connection that never completed.
+    const fetchImpl = answers(status(404), status(503), new Error("ECONNRESET"), ok(document("9.9.9")));
+
+    const settled = awaitNpmVersion("9.9.9", { fetchImpl, onAttempt: quiet });
+    await vi.advanceTimersByTimeAsync(3 * POLL_INTERVAL_MS);
+
+    await expect(settled).resolves.toContain("9.9.9");
+    expect(fetchImpl.urls).toHaveLength(4);
+  });
+
+  it("gives up rather than hanging, so a real publish failure still reddens the run", async () => {
+    // The bound is the half that makes this safe to put in front of the
+    // release's last step: a package that never appears is a publish that
+    // failed, and a wait without a deadline would turn it into a job that runs
+    // until the runner's own timeout kills it with nothing said.
+    const fetchImpl = answers(status(404));
+
+    const settled = awaitNpmVersion("9.9.9", { fetchImpl, timeoutMs: 4 * POLL_INTERVAL_MS, onAttempt: quiet });
+    const refused = expect(settled).rejects.toThrow(/9\.9\.9/u);
+    await vi.advanceTimersByTimeAsync(4 * POLL_INTERVAL_MS);
+
+    await refused;
+    expect(fetchImpl.urls).toHaveLength(5);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("fails at once on a document whose mcpName is not the one the registry authenticates", async () => {
+    // Not a wait: `mcpName` is immutable npm metadata, so a mismatch is a
+    // version already spent and no amount of polling changes it (SPEC 8.7).
+    // Spending the whole budget on it would bury the one error message that
+    // says what went wrong.
+    const fetchImpl = answers(ok(document("9.9.9", "io.github.someone/else")));
+
+    await expect(awaitNpmVersion("9.9.9", { fetchImpl, onAttempt: quiet })).rejects.toThrow(/mcpName/u);
+
+    expect(fetchImpl.urls).toHaveLength(1);
+  });
+
+  it("refuses a version the channels would not accept, before it reads anything", async () => {
+    // The same rule the two stamps apply, for the same reason and one step
+    // earlier: `registry.npmjs.org/<pkg>/latest` is a document that exists and
+    // answers 200, so an unchecked range would sail through the wait and then
+    // fail the step it was added to protect.
+    for (const version of ["latest", "^1.2.3", "1.x", ""]) {
+      const fetchImpl = answers(ok(document(version)));
+      await expect(awaitNpmVersion(version, { fetchImpl, onAttempt: quiet }), version).rejects.toThrow(/version/u);
+      expect(fetchImpl.urls, version).toHaveLength(0);
+    }
+  });
+});
+
+/**
+ * The registry publish (`scripts/publish-registry.ts`).
+ *
+ * The wait above removes the cause; this removes what is left of the effect.
+ * Our reader and the registry's are different clients of a CDN-fronted npm, so
+ * a 200 here does not prove a 200 there — and the registry's own 400 asks the
+ * caller to wait and retry. The retry is deliberately the narrowest thing that
+ * covers it: every other way `mcp-publisher publish` fails is permanent — the
+ * casing 403, a `HEAD` on an asset that is not there, a hash nothing checks —
+ * and a blanket retry would spend the budget twice before reporting any of them.
+ */
+describe("the registry publish", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  /** The 400 measured on the 1.0.1 release, verbatim. */
+  const propagation400 = (version: string): string =>
+    [
+      "Error: publish failed: server returned status 400:",
+      "  registry validation failed for package 0 (kanzeigen-mcp):",
+      `  NPM package 'kanzeigen-mcp' exists, but version '${version}' was not found (status: 404).`,
+      "  A newly published release can take a moment to appear on the registry.",
+      `  Wait and retry, or publish version '${version}' before registering it`,
+    ].join("\n");
+
+  /** The other failure in the same step, the one this project expects to meet. */
+  const casing403 = "Error: publish failed: server returned status 403: you do not have permission to publish this server";
+
+  const LOGGED_IN: PublisherRun = { code: 0, output: "logged in" };
+
+  /**
+   * `mcp-publisher`, recording every invocation. `publishes` answers in order
+   * and then repeats its last answer, because a retry loop asking again is the
+   * ordinary case rather than a special one.
+   */
+  function publisher(
+    publishes: PublisherRun[],
+    login: PublisherRun = LOGGED_IN,
+  ): RunPublisher & { invocations: string[]; published: number } {
+    const run = Object.assign(
+      async (args: readonly string[]): Promise<PublisherRun> => {
+        run.invocations.push(args.join(" "));
+        if (args[0] === "login") return login;
+        run.published += 1;
+        return publishes.length > 1 ? publishes.shift()! : publishes[0]!;
+      },
+      { invocations: [] as string[], published: 0 },
+    );
+    return run;
+  }
+
+  const quiet = (): void => {};
+
+  it("publishes once when the registry takes it", async () => {
+    const run = publisher([{ code: 0, output: "published" }]);
+
+    await expect(publishToRegistry("9.9.9", { run, onAttempt: quiet })).resolves.toBe(0);
+    expect(run.published).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("mints a token for every attempt, because the registry's does not live long enough", async () => {
+    // `tokenDuration: 5 * time.Minute` in the registry's own JWT manager, which
+    // is why its reference workflow logs in in the step immediately before
+    // `publish`. This release cannot: the publish is inside `semantic-release`,
+    // behind the drift gate, the npm publish, the build, the pack, the
+    // commit-back, the GitHub release — and behind a wait that may run for ten
+    // minutes. The workflow's own login is a pre-flight, not the credential
+    // this step uses, and a 401 from an expired one is not a propagation 400,
+    // so nothing would retry it: the same unrecoverable last-step failure #84
+    // is about, wearing a different status code.
+    const run = publisher([{ code: 1, output: propagation400("9.9.9") }, { code: 0, output: "published" }]);
+
+    const settled = publishToRegistry("9.9.9", { run, onAttempt: quiet });
+    await vi.advanceTimersByTimeAsync(PUBLISH_RETRY_MS);
+    await expect(settled).resolves.toBe(0);
+
+    const login = LOGIN_ARGS.join(" ");
+    expect(run.invocations).toEqual([login, "publish", login, "publish"]);
+  });
+
+  it("stops on a login it cannot make, rather than retrying a credential", async () => {
+    // A login that fails is a permission or a misconfigured OIDC context, and
+    // both say the same thing thirty seconds later. It is also the one failure
+    // here that is cheap to fix and expensive to misread as propagation.
+    const run = publisher([{ code: 0, output: "published" }], { code: 1, output: "Error: failed to get OIDC token" });
+
+    await expect(publishToRegistry("9.9.9", { run, onAttempt: quiet })).resolves.not.toBe(0);
+    expect(run.invocations).toEqual([LOGIN_ARGS.join(" ")]);
+    expect(run.published).toBe(0);
+  });
+
+  it("retries the propagation 400 the registry asks the caller to retry", async () => {
+    const run = publisher([{ code: 1, output: propagation400("9.9.9") }, { code: 0, output: "published" }]);
+
+    const settled = publishToRegistry("9.9.9", { run, onAttempt: quiet });
+    await vi.advanceTimersByTimeAsync(PUBLISH_RETRY_MS);
+
+    await expect(settled).resolves.toBe(0);
+    expect(run.published).toBe(2);
+  });
+
+  it("leaves every other failure red on the first attempt", async () => {
+    // Including the one this project expects to meet: `mcpName`'s casing is
+    // inferred rather than documented, and the 403 that confirms it is a
+    // decision to make, not a delay to wait out (SPEC 8.7).
+    const run = publisher([{ code: 1, output: casing403 }]);
+
+    await expect(publishToRegistry("9.9.9", { run, onAttempt: quiet })).resolves.not.toBe(0);
+    expect(run.published).toBe(1);
+  });
+
+  it("does not read a 400 about some other version as its own", async () => {
+    // Three anchors have to line up — the status, the npm-package phrasing and
+    // *this* release's version — because the retry is a narrowing and a loose
+    // match would widen it back into the blanket retry that was refused. The
+    // MCPB asset's `HEAD` is the near miss this guards: it fails on a URL that
+    // carries a version and the words *not found* too.
+    const run = publisher([{ code: 1, output: propagation400("1.0.1") }]);
+
+    await expect(publishToRegistry("9.9.9", { run, onAttempt: quiet })).resolves.not.toBe(0);
+    expect(run.published).toBe(1);
+  });
+
+  it("gives up non-zero after a bounded number of attempts", async () => {
+    // The same bound, for the same reason as the wait's: a registry that keeps
+    // saying 400 is a release that failed, and it has to say so.
+    const run = publisher([{ code: 1, output: propagation400("9.9.9") }]);
+
+    const settled = publishToRegistry("9.9.9", { run, attempts: 3, onAttempt: quiet });
+    await vi.advanceTimersByTimeAsync(2 * PUBLISH_RETRY_MS);
+
+    await expect(settled).resolves.not.toBe(0);
+    expect(run.published).toBe(3);
   });
 });
