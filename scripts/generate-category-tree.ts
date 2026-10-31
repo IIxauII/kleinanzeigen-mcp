@@ -36,14 +36,14 @@ const get = createGet();
 /**
  * Decodes one value of an Astro island's `props` attribute, which wraps every
  * value as `[tag, value]`: `0` a plain value, `1` an array of wrapped values.
- * The search form's category tree uses no other tag.
+ * Only the `categories` prop is decoded, and it uses no other tag.
  */
 function decodeAstroProp(value: unknown): unknown {
   if (Array.isArray(value)) {
     const [tag, inner] = value;
     if (tag === 0) return decodeAstroProp(inner);
     if (tag === 1 && Array.isArray(inner)) return inner.map(decodeAstroProp);
-    fail(`the search form props carry an Astro value tagged ${JSON.stringify(tag)}`);
+    fail(`the search form's category list carries an Astro value tagged ${JSON.stringify(tag)}`);
   }
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
@@ -53,28 +53,44 @@ function decodeAstroProp(value: unknown): unknown {
   return value;
 }
 
-/**
- * Top-level ids, from the search form's category picker. Since the October
- * 2026 redesign the homepage nav is a flat list with no top-level marker, so
- * the picker's tree is the one place the homepage still says which are L1.
- * Its `id: 0` entry is "Alle Kategorien", not a category.
- */
-function readTopLevelIds($: cheerio.CheerioAPI): number[] {
-  const props = $("astro-island[component-url*='SearchForm']").attr("props");
-  if (props === undefined) fail("the homepage has no search form to read top-level categories from");
-  const { categories } = decodeAstroProp(JSON.parse(props)) as { categories?: unknown };
-  if (!Array.isArray(categories)) fail("the search form props carry no category list");
-  return categories
-    .map((category) => (category as { id?: unknown }).id)
-    .filter((id): id is number => Number.isInteger(id) && id !== 0);
+type PickerCategory = { id?: unknown; children?: unknown };
+
+function pickerId(category: PickerCategory): number {
+  const id = Number(category.id);
+  if (!Number.isInteger(id)) fail(`the search form offered a category with id ${JSON.stringify(category.id)}`);
+  return id;
 }
 
-/** Top-level ids in picker order, and every label the nav does render. */
-function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<number, string> } {
+/**
+ * The top-level ids and each one's children, from the search form's category
+ * picker. Since the October 2026 redesign the homepage nav is a flat list with
+ * no top-level marker, so the picker's tree is the one place the homepage
+ * still says which are L1. Its `id: 0` entry is "Alle Kategorien", not a
+ * category.
+ */
+function readPicker($: cheerio.CheerioAPI): Map<number, Set<number>> {
+  const props = $("astro-island[component-url*='SearchForm']").attr("props");
+  if (props === undefined) fail("the homepage has no search form to read top-level categories from");
+  const raw = (JSON.parse(props) as { categories?: unknown }).categories;
+  const categories = raw === undefined ? undefined : decodeAstroProp(raw);
+  if (!Array.isArray(categories)) fail("the search form props carry no category list");
+
+  const picker = new Map<number, Set<number>>();
+  for (const category of categories as PickerCategory[]) {
+    const id = pickerId(category);
+    if (id === 0) continue;
+    const children = Array.isArray(category.children) ? (category.children as PickerCategory[]) : [];
+    picker.set(id, new Set(children.map(pickerId)));
+  }
+  return picker;
+}
+
+/** The picker's top-level tree, and every label the nav does render. */
+function readHomepage(html: string): { picker: Map<number, Set<number>>; labels: Map<number, string> } {
   const $ = cheerio.load(html);
 
-  const topLevelIds = readTopLevelIds($);
-  if (topLevelIds.length === 0) fail("the homepage search form offered no top-level categories");
+  const picker = readPicker($);
+  if (picker.size === 0) fail("the homepage search form offered no top-level categories");
 
   const labels = new Map<number, string>();
   for (const element of $("a[href]").toArray()) {
@@ -83,7 +99,29 @@ function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<num
     const label = $(element).text().trim();
     if (label !== "") labels.set(Number(id), label);
   }
-  return { topLevelIds, labels };
+  return { picker, labels };
+}
+
+/**
+ * Fails unless every top-level category has the same children in the sitemap
+ * partition as in the picker. A picker that drops an L1 or promotes an L2
+ * would otherwise re-parent a whole partition without any error.
+ */
+function crossCheckPartitions(nodes: CategoryNode[], picker: Map<number, Set<number>>): void {
+  for (const [id, pickerChildren] of picker) {
+    const sitemapChildren = new Set(
+      nodes.filter((node) => node.parent_id === id).map((node) => node.category_id),
+    );
+    const onlySitemap = [...sitemapChildren].filter((child) => !pickerChildren.has(child));
+    const onlyPicker = [...pickerChildren].filter((child) => !sitemapChildren.has(child));
+    if (onlySitemap.length > 0 || onlyPicker.length > 0) {
+      fail(
+        `c${id}'s children differ between the sitemap and the search form: ` +
+          `sitemap only [${onlySitemap.map((c) => `c${c}`).join(", ")}], ` +
+          `search form only [${onlyPicker.map((c) => `c${c}`).join(", ")}]`,
+      );
+    }
+  }
 }
 
 /** Recovers one label the nav omits, from its parent's browse page. */
@@ -96,12 +134,12 @@ async function recoverLabel(node: CategorySitemapEntry, parentPath: string): Pro
 
 async function generate(): Promise<CategoryNode[]> {
   const entries = parseCategorySitemap(await get(CATEGORIES_SITEMAP_URL));
-  const { topLevelIds, labels } = readHomepageNav(await get(`${ORIGIN}/`));
+  const { picker, labels } = readHomepage(await get(`${ORIGIN}/`));
 
-  const topLevel = new Set(topLevelIds);
+  const topLevel = new Set(picker.keys());
   for (const id of topLevel) {
     if (!entries.some((entry) => entry.category_id === id)) {
-      fail(`the homepage nav offered top-level c${id}, which the sitemap does not list`);
+      fail(`the homepage search form offered top-level c${id}, which the sitemap does not list`);
     }
   }
   if (!topLevel.has(entries[0]?.category_id ?? -1)) {
@@ -127,6 +165,7 @@ async function generate(): Promise<CategoryNode[]> {
     nodes.push(node);
     if (isTopLevel) parent = node;
   }
+  crossCheckPartitions(nodes, picker);
 
   const omitted = nodes.filter((node) => node.name === "");
   if (omitted.length > 0) {
