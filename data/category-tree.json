@@ -272,26 +272,10 @@
     "parent_name": "Elektronik"
   },
   {
-    "category_id": 407,
-    "name": "Telefone & Fax",
-    "slug": "telefone-fax",
-    "path": "/s-telefone-fax/c407",
-    "parent_id": 161,
-    "parent_name": "Elektronik"
-  },
-  {
     "category_id": 245,
     "name": "Foto",
     "slug": "foto",
     "path": "/s-foto/c245",
-    "parent_id": 161,
-    "parent_name": "Elektronik"
-  },
-  {
-    "category_id": 173,
-    "name": "Smartphones",
-    "slug": "handy-telekom",
-    "path": "/s-handy-telekom/c173",
     "parent_id": 161,
     "parent_name": "Elektronik"
   },
@@ -344,10 +328,34 @@
     "parent_name": "Elektronik"
   },
   {
+    "category_id": 173,
+    "name": "Smartphones",
+    "slug": "handy-telekom",
+    "path": "/s-handy-telekom/c173",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 409,
+    "name": "Smartphone Zubehör",
+    "slug": "smartphone-zubehoer",
+    "path": "/s-smartphone-zubehoer/c409",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
     "category_id": 285,
     "name": "Tablets & Reader",
     "slug": "tablets-reader",
     "path": "/s-tablets-reader/c285",
+    "parent_id": 161,
+    "parent_name": "Elektronik"
+  },
+  {
+    "category_id": 407,
+    "name": "Telefone & Fax",
+    "slug": "telefone-fax",
+    "path": "/s-telefone-fax/c407",
     "parent_id": 161,
     "parent_name": "Elektronik"
   },

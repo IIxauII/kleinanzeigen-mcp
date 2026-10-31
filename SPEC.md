@@ -368,7 +368,7 @@ That last line is the through-line of the whole surface. Agents read values, not
 | `find_location` | **0** | local, over the bundled city dataset |
 | `find_shop` | exactly 1 | the odd resolver out |
 
-**Discovery is tools, not MCP resources.** 161 categories and 11 091 locations are exactly the static documents resources exist for, and resources were rejected anyway: the resolvers do not *serve* data, they **refuse to guess**. 12 slugs collide across 25 nodes, names collide too, and a shop-name match may not be a name match at all — so matching must report candidates, which is behaviour a document cannot do. Agents also pull resources unreliably, which would make the collision guard optional in practice.
+**Discovery is tools, not MCP resources.** 162 categories and 11 091 locations are exactly the static documents resources exist for, and resources were rejected anyway: the resolvers do not *serve* data, they **refuse to guess**. 12 slugs collide across 25 nodes, names collide too, and a shop-name match may not be a name match at all — so matching must report candidates, which is behaviour a document cannot do. Agents also pull resources unreliably, which would make the collision guard optional in practice.
 
 **`describe_category` is out.** It would describe filters you cannot apply (§2.6) — a footgun wearing a helpful hat.
 
@@ -527,7 +527,7 @@ find_location({ query: string })
 
 **Both always return a list, never a bare object, even on an exact single hit.** A shape that sometimes resolves for you is a shape that teaches the caller to stop reading. The never-guess rule only holds if the caller cannot skip the check, and a `best:` hint would be the same guess wearing a different name.
 
-Matching is **case- and diacritic-insensitive** against the name and against a qualified `"Parent > Child"` form. **No fuzzy / edit-distance matching** — 161 known strings and an LLM caller; approximate matching buys little and turns a loud failure into a quiet one. **Never match on a slug**: slugs are cosmetic URL segments and collide 25 ways.
+Matching is **case- and diacritic-insensitive** against the name and against a qualified `"Parent > Child"` form. **No fuzzy / edit-distance matching** — 162 known strings and an LLM caller; approximate matching buys little and turns a loud failure into a quiet one. **Never match on a slug**: slugs are cosmetic URL segments and collide 25 ways.
 
 Zero matches is `{ matches: [], count: 0 }` — an answer.
 
@@ -829,12 +829,14 @@ Reading is not writing; ADR-0002's invariant is untouched.
 
 | Dataset | Source | Size | Contents |
 | --- | --- | --- | --- |
-| `category-tree.json` | `GET /sitemap_categories.xml` (2 094 B) + `GET /` for labels | tiny | all **161** nodes, 2 levels, id + German name + slug + path |
+| `category-tree.json` | `GET /sitemap_categories.xml` (2 094 B) + `GET /` for labels | tiny | all **162** nodes, 2 levels, id + German name + slug + path |
 | `cities.json` | `GET /sitemap_cities.xml` (798 561 B) | ~84 KB gzipped | **11 091** locations, slug + id |
 
 **Both are build-time GETs run by a maintainer, not by the server.**
 
 **Category tree provenance.** The sitemap's id set is **byte-identical** to the disallowed `/s-kategorie-baum.html` tree — 161 ids, zero added, zero missing — and it is depth-first, so partitioning at the 15 L1 markers recovers every parent's child set exactly. The homepage nav confirms the same 15 partitions independently but **silently omits 3 of 161 nodes** (`c286 Bahn & ÖPNV`, `c269 Beauty & Gesundheit`, `c273 Tauschen`) — absent from the HTML, not collapsed behind a toggle. **Only the sitemap is complete; the homepage is a label convenience, not a source of truth.** The 3 missing labels are recovered from their parents' browse pages.
+
+> **Since the October 2026 redesign** the homepage nav is a flat, screen-reader-only list of all 162 nodes with **no L1 marker**, so the generator takes the 15 L1 ids from the search form's category picker (the `SearchForm` island's `categories` prop) instead. The nav no longer omits any label; the browse-page recovery stays for when it does again ([#86](https://github.com/IIxauII/kleinanzeigen-mcp/issues/86)).
 
 **City dataset gaps, hard-coded.** `sitemap_cities.xml` omits the three city-states — Berlin `l3331`, Hamburg `l9409`, Bremen `l1` — which appear only as `/stadt/` landing pages. **Hard-code those three ids.** Also absent: sub-Ortsteile (e.g. Wedding `l3503`) and the entire postcode layer, whose ids are unobtainable from any allowed source. Postcodes still work as input, via `?locationStr=`.
 
@@ -857,7 +859,7 @@ Four things about it are decisions, not implementation detail:
 
 A GitHub Actions runner **is** served by the site: three runs from `ubuntu-latest` on three distinct Azure IPs returned HTTP 200 with no redirect, no `Retry-After` and no interstitial, on both gateway routes the check touches (`sitemaps` for the sitemap leg, `k-desktop` for the 17 katalog requests). ADR-0003 was never put to the test, because there was no block to route around. What is **not** established is durability — three runs inside three minutes, and Azure ranges are exactly what a future tightening would target. The cron's own exit status is the monitor for this answer expiring: a check that starts failing on the network leg rather than on real drift is the signal.
 
-The live category set was **161 as of 2026-09-23**, byte-for-byte the count in `data/category-tree.json`. The check is cheap in requests but not in bytes — one katalog state page is 583 KB and the root 137 KB, so a full run is multi-megabyte. Irrelevant to a monthly cron; worth knowing before anyone proposes running it per-PR.
+The live category set was **162 as of 2026-10-31**, byte-for-byte the count in `data/category-tree.json`. The check is cheap in requests but not in bytes — one katalog state page is 583 KB and the root 137 KB, so a full run is multi-megabyte. Irrelevant to a monthly cron; worth knowing before anyone proposes running it per-PR.
 
 **The shop directory is deliberately not bundled**, on four independent grounds: `liveAds` is a live inventory count a snapshot would freeze; the ordering reseeds nightly (`randomizationSeed` is the date); `totalHits` drifted 53 811 → 53 808 inside 30 minutes; and the sweep is 1 077 requests ≈ 27 minutes.
 
@@ -884,7 +886,7 @@ For contrast, five of the seven existing kleinanzeigen MCP servers depend on a ~
 
 Node ≥ 22.18 strips TypeScript types natively, which would allow pointing the MCP config straight at `src/index.ts`. Rejected: run-from-clone already requires `npm install`, so no-build saves exactly one `npm run build`, and **type-stripping does not typecheck — it deletes annotations**. A bundle also makes cold start a single file read instead of a `node_modules` resolution walk.
 
-The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would mean JS-parsing 11 231 locations on every process start, and sidecar files stay diffable for the drift check (§7). They survive MCPB packing untouched, and `import.meta.url` still resolves beside them after an extension is extracted to disk (§8.7).
+The two datasets stay **sidecar JSON in `dist/`**, not inlined: inlining would mean JS-parsing 11 243 locations on every process start, and sidecar files stay diffable for the drift check (§7). They survive MCPB packing untouched, and `import.meta.url` still resolves beside them after an extension is extracted to disk (§8.7).
 
 **`prepack` is the build gate, and the hook was chosen by measurement.** `dist/` is gitignored, so `files: ["dist"]` packs only because a built `dist` happens to exist locally — from a fresh clone the tarball is `README.md` + `package.json` and `bin` points at nothing. Measured against npm 11.12.1:
 
