@@ -35,7 +35,7 @@ export type CityDataset = readonly LocationNode[];
  * The on-disk shape: rows as tuples, with each locality naming its state by
  * index into `states`.
  *
- * Objects would repeat five keys and a state name 11 231 times, which the
+ * Objects would repeat five keys and a state name 11 243 times, which the
  * gzipped package pays for; tuples are the same data at a third of the bytes.
  * The generator writes one row per line, so the file stays diffable for the
  * drift check (SPEC 8.2).

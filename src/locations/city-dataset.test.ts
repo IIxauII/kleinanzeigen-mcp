@@ -28,7 +28,7 @@ describe("the bundled city dataset", () => {
   it("carries the catalogue's first two tiers: 16 federal states and their children", () => {
     const dataset = loadCityDataset(BUNDLED);
     expect(dataset.filter((location) => location.level === "state")).toHaveLength(16);
-    expect(dataset).toHaveLength(11231);
+    expect(dataset).toHaveLength(11243);
   });
 
   it("stays a sidecar small enough to ship, one row per line", () => {
@@ -38,7 +38,7 @@ describe("the bundled city dataset", () => {
     // encoding is what keeps it to twice rather than four times, and the line
     // per row is what keeps the drift check diffable.
     expect(gzipSync(raw, { level: 9 }).length).toBeLessThan(150_000);
-    expect(raw.toString("utf8").trimEnd().split("\n")).toHaveLength(11231 + 6);
+    expect(raw.toString("utf8").trimEnd().split("\n")).toHaveLength(11243 + 6);
   });
 
   it("hard-codes the three city-states the sitemap omits", () => {
