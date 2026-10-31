@@ -268,7 +268,7 @@ type Listing = {
 };
 ```
 
-**Attributes are verbatim German label/value pairs in rendered order** — `{ label: "Zustand", value: "Sehr Gut" }` — with no key mapping. The machine keys (`autos.km_i`, `global.zustand`) exist in `robots.txt` and in filter URLs but **not in the detail page's DOM**, so the typed key and the readable value live on different surfaces. A mapping table for ~40 unenumerable keys across 161 categories has no verification path, and a half-populated typed field is worse than an honest untyped one.
+**Attributes are verbatim German label/value pairs in rendered order** — `{ label: "Zustand", value: "Sehr Gut" }` — with no key mapping. The machine keys (`autos.km_i`, `global.zustand`) exist in `robots.txt` and in filter URLs but **not in the detail page's DOM**, so the typed key and the readable value live on different surfaces. A mapping table for ~40 unenumerable keys across 162 categories has no verification path, and a half-populated typed field is worse than an honest untyped one.
 
 **Images are exactly what the page gave.** Search returns the `$_2` thumbnail plus `image_count`; `get_listing` returns the large gallery URLs plus the count. Stripping `rule=` and documenting the size grammar would mean owning a URL vocabulary we neither control nor version.
 
@@ -572,7 +572,7 @@ Envelope & {
 
 Never auto-selected, even at `count: 1` — **and here that rule is a correctness guard, not a homonym guard.** `fulltext` matches **profile prose, not just names**: `"decathlon"` returns `TGW Systems Integration GmbH`, whose `about` text merely names Decathlon as a customer, and `searchScope: "BRANDING"` does not exclude it. **A single exact hit can still be the wrong shop.**
 
-> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** "Validated against the bundled trees" holds for **`category_id` and not for `location_id`**, and the difference is the datasets rather than the ids. The filter ids *are* the same numeric ids — the same id **space** — but the two bundled sets are not the same shape of complete. The category tree is complete: 161 of 161 nodes, byte-identical to the disallowed tree (§7). The city dataset knowingly is not: it holds the location tree's first two tiers, and **sub-Ortsteile (Wedding `l3503`) and the entire postcode layer are absent from every allowed source** (§7's correction).
+> **Correction, recorded while building `find_shop` ([#23](https://github.com/IIxauII/kleinanzeigen-mcp/issues/23)).** "Validated against the bundled trees" holds for **`category_id` and not for `location_id`**, and the difference is the datasets rather than the ids. The filter ids *are* the same numeric ids — the same id **space** — but the two bundled sets are not the same shape of complete. The category tree is complete: 162 of 162 nodes, byte-identical to the disallowed tree (§7). The city dataset knowingly is not: it holds the location tree's first two tiers, and **sub-Ortsteile (Wedding `l3503`) and the entire postcode layer are absent from every allowed source** (§7's correction).
 >
 > So refusing `l3503` would reject an id the directory filters by and answers **honestly** — the opposite of the failure the check exists to prevent — and a caller can hold such an id legitimately, since the third number in a listing URL is a location id (§2.2). The category id is checked; the location id is passed through to the site, which is the authority for it.
 
