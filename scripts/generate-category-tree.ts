@@ -8,10 +8,11 @@
  * Ids come from `sitemap_categories.xml`, which is depth-first and whose id set
  * is byte-identical to the disallowed `/s-kategorie-baum.html` tree — so
  * partitioning it at the top-level markers recovers every parent's child set
- * exactly. German labels come from the homepage nav, which confirms the same
- * partitions independently but silently omits a few nodes; those labels are
- * recovered from their parents' browse pages. Only the sitemap is complete; the
- * homepage is a label convenience, not a source of truth.
+ * exactly. The top-level ids come from the homepage search form's category
+ * picker, which confirms the same partitions independently; German labels come
+ * from the homepage nav, and any it omits are recovered from their parents'
+ * browse pages. Only the sitemap is complete; the homepage is a label
+ * convenience, not a source of truth.
  */
 import * as cheerio from "cheerio";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -32,15 +33,48 @@ function fail(message: string): never {
 /** Serialised at the shared 1500 ms gap, the same one the drift check holds (SPEC 2.8). */
 const get = createGet();
 
-/** Top-level ids in nav order, and every label the nav does render. */
+/**
+ * Decodes one value of an Astro island's `props` attribute, which wraps every
+ * value as `[tag, value]`: `0` a plain value, `1` an array of wrapped values.
+ * The search form's category tree uses no other tag.
+ */
+function decodeAstroProp(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    const [tag, inner] = value;
+    if (tag === 0) return decodeAstroProp(inner);
+    if (tag === 1 && Array.isArray(inner)) return inner.map(decodeAstroProp);
+    fail(`the search form props carry an Astro value tagged ${JSON.stringify(tag)}`);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, decodeAstroProp(inner)]),
+    );
+  }
+  return value;
+}
+
+/**
+ * Top-level ids, from the search form's category picker. Since the October
+ * 2026 redesign the homepage nav is a flat list with no top-level marker, so
+ * the picker's tree is the one place the homepage still says which are L1.
+ * Its `id: 0` entry is "Alle Kategorien", not a category.
+ */
+function readTopLevelIds($: cheerio.CheerioAPI): number[] {
+  const props = $("astro-island[component-url*='SearchForm']").attr("props");
+  if (props === undefined) fail("the homepage has no search form to read top-level categories from");
+  const { categories } = decodeAstroProp(JSON.parse(props)) as { categories?: unknown };
+  if (!Array.isArray(categories)) fail("the search form props carry no category list");
+  return categories
+    .map((category) => (category as { id?: unknown }).id)
+    .filter((id): id is number => Number.isInteger(id) && id !== 0);
+}
+
+/** Top-level ids in picker order, and every label the nav does render. */
 function readHomepageNav(html: string): { topLevelIds: number[]; labels: Map<number, string> } {
   const $ = cheerio.load(html);
 
-  const topLevelIds = $("a[id^='category-']")
-    .toArray()
-    .map((element) => Number($(element).attr("id")?.slice("category-".length)))
-    .filter((id) => Number.isInteger(id));
-  if (topLevelIds.length === 0) fail("the homepage nav rendered no top-level categories");
+  const topLevelIds = readTopLevelIds($);
+  if (topLevelIds.length === 0) fail("the homepage search form offered no top-level categories");
 
   const labels = new Map<number, string>();
   for (const element of $("a[href]").toArray()) {
