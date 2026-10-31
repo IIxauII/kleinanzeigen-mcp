@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/IIxauII/kleinanzeigen-mcp/compare/v1.0.1...v1.1.0) (2026-10-31)
+
+
+### Features
+
+* **data:** refresh both datasets against the live site ([#97](https://github.com/IIxauII/kleinanzeigen-mcp/issues/97)) ([5055a0a](https://github.com/IIxauII/kleinanzeigen-mcp/commit/5055a0a24b570a187068341e7ebd7963bd53cc37)), closes [#86](https://github.com/IIxauII/kleinanzeigen-mcp/issues/86)
+
 ## [1.0.1](https://github.com/IIxauII/kleinanzeigen-mcp/compare/v1.0.0...v1.0.1) (2026-09-23)
 
 
